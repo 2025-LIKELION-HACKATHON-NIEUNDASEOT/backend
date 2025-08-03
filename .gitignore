@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg
+*.egg-info/
+dist/
+build/
+
+# Virtual environment
+mainvenv/
+venv/
+ENV/
+env/
+
+# Django
+*.log
+*.pot
+*.pyc
+db.sqlite3
+db.sqlite3-journal
+media/
+
+# VS Code
+.vscode/
+
+# 환경 설정 파일
+*.env
+.env.*
+
+# OS 관련
+.DS_Store
+Thumbs.db
