@@ -4,22 +4,29 @@
 from .base import *
 import environ
 
-# django-environ 설정
-env = environ.Env()
-environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
+# django-environ
+env = environ.Env(
+    DEBUG=(bool, False)
+)
+env.read_env(os.path.join(BASE_DIR, '.env'))
 
 DEBUG = False
 SECRET_KEY = env('SECRET_KEY')
 
-# 배포 서버 설정
-ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['54.180.238.184', 'api.villit.o-r.kr', 'villit.o-r.kr'])
+# 배포 서버
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=[
+    '54.180.238.184', 
+    'villit.o-r.kr',
+    'localhost',
+    '127.0.0.1'
+])
 
 # Database - AWS RDS MySQL
 DATABASES = {
     'default': env.db() 
 }
 
-# AWS S3 설정
+# AWS S3
 DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
 STATICFILES_STORAGE = 'storages.backends.s3boto3.S3StaticStorage'
 
@@ -35,7 +42,7 @@ AWS_S3_OBJECT_PARAMETERS = {
 STATIC_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/static/'
 MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/media/'
 
-# CORS 설정
+# CORS
 CORS_ALLOWED_ORIGINS = env.list('CORS_ALLOWED_ORIGINS', default=[
     "https://villit.o-r.kr",
     "https://www.villit.o-r.kr",
@@ -43,10 +50,13 @@ CORS_ALLOWED_ORIGINS = env.list('CORS_ALLOWED_ORIGINS', default=[
     "http://localhost:5173",
 ])
 
-# Swagger 설정
-SWAGGER_SETTINGS['DEFAULT_API_URL'] = 'https://api.villit.o-r.kr'
+# Swagger
+SWAGGER_SETTINGS = {
+    'USE_SESSION_AUTH': False,
+    'DEFAULT_API_URL': 'https://villit.o-r.kr'
+}
 
-# 보안 설정
+# 보안
 SECURE_SSL_REDIRECT = env.bool('SECURE_SSL_REDIRECT', default=False)  
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
@@ -54,7 +64,7 @@ SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
 
-# 로깅 설정
+# 로깅
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
