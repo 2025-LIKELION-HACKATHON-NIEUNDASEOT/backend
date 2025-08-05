@@ -26,6 +26,7 @@ media/
 # 환경 설정 파일
 *.env
 .env.*
+.env.local
 
 # OS 관련
 .DS_Store
