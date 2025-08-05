@@ -21,8 +21,9 @@ jobs:
         key: ${{ secrets.EC2_SSH_KEY }}
 
         script: |
-          cd /home/ubuntu/Villit_BE/localadmin
+          cd /home/ubuntu/Villit_BE
           git pull origin main
+          cd localadmin
           source venv/bin/activate
           pip install -r requirements.txt
           export DJANGO_SETTINGS_MODULE=localadmin.settings.production
