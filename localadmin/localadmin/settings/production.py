@@ -18,7 +18,8 @@ ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=[
     '54.180.238.184', 
     'villit.o-r.kr',
     'localhost',
-    '127.0.0.1'
+    '127.0.0.1',
+    '0.0.0.0',
 ])
 
 # Database - AWS RDS MySQL
