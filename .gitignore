@@ -31,4 +31,6 @@ media/
 .DS_Store
 Thumbs.db
 
+# Static files
 staticfiles/
+static/
