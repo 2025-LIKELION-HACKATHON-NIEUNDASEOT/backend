@@ -1,26 +1,18 @@
-"""
-URL configuration for localadmin project.
-
-The `urlpatterns` list routes URLs to views. For more information please see:
-    https://docs.djangoproject.com/en/5.2/topics/http/urls/
-Examples:
-Function views
-    1. Add an import:  from my_app import views
-    2. Add a URL to urlpatterns:  path('', views.home, name='home')
-Class-based views
-    1. Add an import:  from other_app.views import Home
-    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
-Including another URLconf
-    1. Import the include() function: from django.urls import include, path
-    2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
-"""
+from django.shortcuts import redirect
 from django.contrib import admin
-from django.urls import path, re_path
-from rest_framework import permissions
+from django.urls import path, re_path, include
+
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
 from django.conf import settings
 from django.conf.urls.static import static
+from rest_framework import permissions
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.response import Response
+from drf_yasg.utils import swagger_auto_schema
+
+def home_redirect(request):
+    return redirect('/swagger/')
 
 schema_view = get_schema_view(
     openapi.Info(
@@ -35,11 +27,38 @@ schema_view = get_schema_view(
     permission_classes=(permissions.AllowAny,),
 )
 
+@swagger_auto_schema(
+    method='get',
+    operation_description="서버 상태 확인",
+    responses={200: openapi.Response('서버 정상', openapi.Schema(
+        type=openapi.TYPE_OBJECT,
+        properties={
+            'status': openapi.Schema(type=openapi.TYPE_STRING, description='서버 상태'),
+        }
+    ))}
+)
+@api_view(['GET'])
+@permission_classes([permissions.AllowAny])
+def health_check(request):
+    """서버 헬스체크 API"""
+    return Response({"status": "OK"})
+
 urlpatterns = [
+    # 루트 URL (swagger)
+    path('', home_redirect, name='home'),
+    
+    # 관리자 페이지
     path('admin/', admin.site.urls),
+    
+    # 앱 URL
+    
+    # DRF-yasg
     re_path(r'^swagger(?P<format>\.json|\.yaml)$', schema_view.without_ui(cache_timeout=0), name='schema-json'),
     re_path(r'^swagger/$', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
     re_path(r'^redoc/$', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
+    
+    # 헬스체크
+    path('actuator/health', health_check, name='health-check'),
 ]
 
 if settings.DEBUG:
