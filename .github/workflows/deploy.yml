@@ -28,6 +28,7 @@ jobs:
           pip install -r requirements.txt
           export DJANGO_SETTINGS_MODULE=localadmin.settings.production
           python manage.py migrate
+          python manage.py create_initial_data --force
           python manage.py collectstatic --noinput
           sudo systemctl restart gunicorn
           sudo systemctl restart nginx
