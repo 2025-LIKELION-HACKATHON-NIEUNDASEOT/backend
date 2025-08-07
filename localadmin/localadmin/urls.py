@@ -40,7 +40,7 @@ schema_view = get_schema_view(
 @api_view(['GET'])
 @permission_classes([permissions.AllowAny])
 def health_check(request):
-    """서버 헬스체크 API"""
+    # 서버 헬스 체크 api
     return Response({"status": "OK"})
 
 urlpatterns = [
@@ -51,6 +51,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     
     # 앱 URL
+    path('api/auth/', include('user.urls')),
     
     # DRF-yasg
     re_path(r'^swagger(?P<format>\.json|\.yaml)$', schema_view.without_ui(cache_timeout=0), name='schema-json'),
