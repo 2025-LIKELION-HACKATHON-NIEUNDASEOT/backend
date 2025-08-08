@@ -42,14 +42,12 @@ class CreateInitialData(BaseCommand):
         categories_data = [
             {'category_id': 'TRANSPORT', 'category_name': '교통'},
             {'category_id': 'CULTURE', 'category_name': '문화'},
-            {'category_id': 'ENVIRONMENT', 'category_name': '환경'},
-            {'category_id': 'WELFARE', 'category_name': '복지'},
-            {'category_id': 'EDUCATION', 'category_name': '교육'},
-            {'category_id': 'SAFETY', 'category_name': '안전'},
+            {'category_id': 'HOUSING', 'category_name': '주택'},
             {'category_id': 'ECONOMY', 'category_name': '경제'},
+            {'category_id': 'ENVIRONMENT', 'category_name': '환경'},
+            {'category_id': 'SAFETY', 'category_name': '안전'},
+            {'category_id': 'WELFARE', 'category_name': '복지'},
             {'category_id': 'ADMINISTRATION', 'category_name': '행정'},
-            {'category_id': 'URBAN_PLANNING', 'category_name': '도시계획'},
-            {'category_id': 'HEALTH', 'category_name': '보건'},
         ]
 
         created_count = 0

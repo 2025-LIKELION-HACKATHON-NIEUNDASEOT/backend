@@ -59,7 +59,7 @@ def _create_error_response(message, errors=None):
     methods=['put'],
     operation_summary="사용자 프로필 수정",
     operation_description="""
-    사용자 프로필 정보를 수정합니다. 바꾸고자 하는 것만 바꿀 때 사용합니다.
+    사용자 프로필 정보를 수정합니다. 
     
     **수정 가능한 필드:**
     - name: 사용자 이름
@@ -69,8 +69,12 @@ def _create_error_response(message, errors=None):
     - regions: 관심 지역 배열 (기존 데이터 전체 교체)
     
     **주의사항:**
-    - 배열 필드는 기존 데이터를 모두 삭제하고 새로 설정됩니다.
+    - 관심 주제와 지역은 수정 시, 기존에 선택된 항목과 새로 선택된 항목을 모두 포함한 전체 배열로 전달해야 합니다.
     - 빈 배열을 전달하면 해당 데이터를 모두 삭제합니다.
+    
+    **가능한 category_ids 목록:**
+    - TRANSPORT (교통), CULTURE (문화), HOUSING (주택), ECONOMY (경제), 
+    - ENVIRONMENT (환경), SAFETY (안전), WELFARE (복지), ADMINISTRATION (행정)
     """,
     request_body=openapi.Schema(
         type=openapi.TYPE_OBJECT,
