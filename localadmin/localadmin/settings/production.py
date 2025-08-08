@@ -10,7 +10,7 @@ env = environ.Env(
 )
 env.read_env(os.path.join(BASE_DIR, '.env'))
 
-DEBUG = False
+DEBUG = True
 SECRET_KEY = env('SECRET_KEY')
 
 # 배포 서버
