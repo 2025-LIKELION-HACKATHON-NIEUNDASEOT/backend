@@ -17,7 +17,7 @@ class UserCategorySerializer(serializers.ModelSerializer):
     
     class Meta:
         model = UserCategory
-        fields = ['id', 'category', 'created_at']
+        fields = ['id', 'category']
 
 
 class UserRegionSerializer(serializers.ModelSerializer):
@@ -26,7 +26,7 @@ class UserRegionSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = UserRegion
-        fields = ['id', 'region_id', 'type', 'type_display', 'created_at']
+        fields = ['id', 'region_id', 'type', 'type_display']
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
@@ -34,12 +34,11 @@ class UserProfileSerializer(serializers.ModelSerializer):
     user_categories = UserCategorySerializer(many=True, read_only=True)
     user_regions = UserRegionSerializer(many=True, read_only=True)
     gender_display = serializers.CharField(source='get_gender_display', read_only=True)
-    age = serializers.ReadOnlyField()
     
     class Meta:
         model = User
         fields = [
-            'id', 'user_id', 'name', 'birth', 'gender', 'gender_display', 'age',
+            'id', 'user_id', 'name', 'birth', 'gender', 'gender_display',
             'user_categories', 'user_regions', 'created_at'
         ]
         read_only_fields = ['id', 'user_id', 'created_at', 'age']

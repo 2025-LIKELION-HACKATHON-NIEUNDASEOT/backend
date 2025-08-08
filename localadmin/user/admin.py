@@ -5,24 +5,20 @@ from .models import User, Category, UserCategory, UserRegion
 @admin.register(User)
 class UserAdmin(admin.ModelAdmin):
     # 사용자 관리 페이지
-    list_display = ['user_id', 'name', 'birth', 'gender', 'age', 'created_at']  
+    list_display = ['user_id', 'name', 'birth', 'gender', 'created_at']  
     list_filter = ['gender', 'created_at']
     search_fields = ['user_id', 'name'] 
-    readonly_fields = ['created_at', 'age']
+    readonly_fields = ['created_at']
     
     fieldsets = (
         ('기본 정보', {
             'fields': ('user_id', 'name', 'birth', 'gender')  
         }),
         ('시스템 정보', {
-            'fields': ('created_at', 'age'),
+            'fields': ['created_at'],
             'classes': ('collapse',)
         }),
     )
-    
-    def age(self, obj):
-        return obj.age
-    age.short_description = '나이'
 
 
 @admin.register(Category)
@@ -51,10 +47,10 @@ class CategoryAdmin(admin.ModelAdmin):
 @admin.register(UserCategory)
 class UserCategoryAdmin(admin.ModelAdmin):
     # 사용자-카테고리 관계 관리 페이지
-    list_display = ['id', 'get_user_id', 'get_category_name', 'created_at']
-    list_filter = ['category', 'created_at']
+    list_display = ['id', 'get_user_id', 'get_category_name']
+    list_filter = ['category']
     search_fields = ['user__user_id', 'category__category_name']
-    readonly_fields = ['id', 'created_at']
+    readonly_fields = ['id']
     
     def get_user_id(self, obj):
         return obj.user.user_id
@@ -68,10 +64,10 @@ class UserCategoryAdmin(admin.ModelAdmin):
 @admin.register(UserRegion)
 class UserRegionAdmin(admin.ModelAdmin):
     # 사용자-지역 관계 관리 페이지
-    list_display = ['id', 'get_user_id', 'region_id', 'type', 'created_at']
-    list_filter = ['type', 'created_at']
+    list_display = ['id', 'get_user_id', 'region_id', 'type']
+    list_filter = ['type']
     search_fields = ['user__user_id', 'region_id']
-    readonly_fields = ['id', 'created_at']
+    readonly_fields = ['id']
     
     def get_user_id(self, obj):
         return obj.user.user_id

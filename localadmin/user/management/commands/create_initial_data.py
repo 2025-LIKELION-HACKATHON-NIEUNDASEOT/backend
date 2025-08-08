@@ -4,7 +4,7 @@ from django.core.management.base import BaseCommand, CommandError
 from user.models import User, Category, UserCategory, UserRegion, GenderChoices, RegionTypeChoices
 
 
-class CreateInitialData(BaseCommand):
+class Command(BaseCommand):
     # 초기 데이터 생성 커맨드
     help = '사용자 프로필 시스템의 초기 데이터를 생성합니다.'
 
@@ -136,7 +136,7 @@ class CreateInitialData(BaseCommand):
             )
 
     def create_user_regions(self, force=False):
-        # 사용자-지역 관계 생성
+        # 사용자-지역 관계 생성 (지역 기능이 생기면 수정 예정)
         self.stdout.write('사용자-지역 관계를 생성중입니다...')
 
         try:

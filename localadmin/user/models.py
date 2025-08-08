@@ -1,7 +1,6 @@
 from django.db import models
 from django.core.validators import MinLengthValidator
 
-
 class GenderChoices(models.TextChoices):
     # 성별 선택
     MALE = 'M', '남성'
@@ -60,17 +59,6 @@ class User(BaseTimeStampModel):
 
     def __str__(self):
         return f"{self.name} ({self.user_id})"
-    
-    @property
-    def age(self):
-        # 나이 계산
-        if self.birth:
-            from datetime import date
-            today = date.today()
-            return today.year - self.birth.year - (
-                (today.month, today.day) < (self.birth.month, self.birth.day)
-            )
-        return None
 
 
 class Category(models.Model):
@@ -100,7 +88,7 @@ class Category(models.Model):
         return self.category_name
 
 
-class UserCategory(BaseTimeStampModel):
+class UserCategory(models.Model):
     user = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
@@ -122,7 +110,7 @@ class UserCategory(BaseTimeStampModel):
         return f"{self.user.user_id} → {self.category.category_name}"
 
 
-class UserRegion(BaseTimeStampModel):
+class UserRegion(models.Model):
     user = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
