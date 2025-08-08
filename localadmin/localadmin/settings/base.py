@@ -22,6 +22,8 @@ INSTALLED_APPS = [
     'drf_yasg', 
     'corsheaders', 
     'storages',  
+    
+    'user',
 ]
 
 MIDDLEWARE = [
