@@ -262,6 +262,8 @@ def session_create(request):
     operation_summary="챗봇 세션 삭제",
     operation_description="""
     챗봇 세션과 모든 메시지를 삭제합니다. 삭제된 데이터는 복구할 수 없습니다.
+    (해당 기능이 피그마에는 없는 것 같은데... 일단 혹시 모르니까 만들어 두었습니다.)
+    (테스트할 때 사용하시면 편할 듯 합니다.)
     """,
     responses={
         200: openapi.Response(description="삭제 성공"),
