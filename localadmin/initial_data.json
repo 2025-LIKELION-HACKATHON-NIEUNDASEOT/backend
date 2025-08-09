@@ -1,0 +1,42 @@
+[
+    {
+        "model": "region.region",
+        "fields": {
+            "region_code": "11",
+            "city": "서울특별시",
+            "district": null
+        }
+    },
+    {
+        "model": "region.region",
+        "fields": {
+            "region_code": "11110",
+            "city": "서울특별시",
+            "district": "종로구"
+        }
+    },
+    {
+        "model": "region.region",
+        "fields": {
+            "region_code": "11350",
+            "city": "서울특별시",
+            "district": "도봉구"
+        }
+    },
+    {
+        "model": "region.region",
+        "fields": {
+            "region_code": "41",
+            "city": "경기도",
+            "district": null
+        }
+    },
+    {
+        "model": "region.region",
+        "fields": {
+            "region_code": "41110",
+            "city": "경기도",
+            "district": "수원시"
+        }
+    }
+]

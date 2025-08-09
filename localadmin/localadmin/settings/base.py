@@ -24,6 +24,8 @@ INSTALLED_APPS = [
     'storages',  
     
     'user',
+
+    'region',
 ]
 
 MIDDLEWARE = [

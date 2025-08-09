@@ -52,6 +52,7 @@ urlpatterns = [
     
     # 앱 URL
     path('api/user/', include('user.urls')),
+    path('api/', include('region.urls')), # region/urls.py에
     
     # DRF-yasg
     re_path(r'^swagger(?P<format>\.json|\.yaml)$', schema_view.without_ui(cache_timeout=0), name='schema-json'),
