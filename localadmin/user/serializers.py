@@ -64,10 +64,10 @@ class UserProfileUpdateSerializer(serializers.Serializer):
         help_text=f'성별: {", ".join([f"{choice[0]}({choice[1]})" for choice in GenderChoices.choices])}'
     )
     category_ids = serializers.ListField(
-        child=serializers.CharField(max_length=50),
+        child=serializers.IntegerField(),  
         required=False,
         allow_empty=True,
-        help_text="관심 카테고리 ID 목록 (예: ['TRANSPORT', 'CULTURE'])"
+        help_text="관심 카테고리 ID 목록 (예: [1, 2, 3])"  
     )
     regions = serializers.ListField(
         child=serializers.DictField(),
@@ -83,17 +83,17 @@ class UserProfileUpdateSerializer(serializers.Serializer):
         return value
     
     def validate_category_ids(self, value):
-        # 카테고리 ID 목록 검증
+        # 카테고리 ID 목록 검증 
         if value:
             unique_ids = list(set(value))
             
             existing_categories = Category.objects.filter(
-                category_id__in=unique_ids,
+                id__in=unique_ids,  
                 is_active=True
             )
             
             if len(existing_categories) != len(unique_ids):
-                existing_ids = set(existing_categories.values_list('category_id', flat=True))
+                existing_ids = set(existing_categories.values_list('id', flat=True)) 
                 invalid_ids = set(unique_ids) - existing_ids
                 raise serializers.ValidationError(
                     f"존재하지 않거나 비활성화된 카테고리 ID: {list(invalid_ids)}"
