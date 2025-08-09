@@ -1,10 +1,7 @@
-from django.urls import path, include
-from rest_framework.routers import DefaultRouter
-from .views import RegionViewSet
-
-router = DefaultRouter()
-router.register(r'region', RegionViewSet, basename='region')
+from django.urls import path
+from .views import RegionListAPIView
 
 urlpatterns = [
-    path('', include(router.urls)),
+    # 전체 지역 목록 조회 및 검색만
+    path('regions/', RegionListAPIView.as_view(), name='region-list'),
 ]
