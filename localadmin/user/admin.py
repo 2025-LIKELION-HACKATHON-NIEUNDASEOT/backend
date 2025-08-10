@@ -24,20 +24,20 @@ class UserAdmin(admin.ModelAdmin):
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
     # 카테고리 관리 페이지
-    list_display = ['category_id', 'category_name', 'is_active', 'user_count']
-    list_filter = ['is_active']
-    search_fields = ['category_id', 'category_name']
-    actions = ['make_active', 'make_inactive']
-    
+    list_display  = ['id', 'category_name', 'is_active', 'user_count']
+    list_filter   = ['is_active']
+    search_fields = ['category_name']
+    actions       = ['make_active', 'make_inactive']
+
     def user_count(self, obj):
         return UserCategory.objects.filter(category=obj).count()
     user_count.short_description = '사용자 수'
-    
+
     def make_active(self, request, queryset):
         updated = queryset.update(is_active=True)
         self.message_user(request, f'{updated}개 카테고리가 활성화되었습니다.')
     make_active.short_description = '선택한 카테고리 활성화'
-    
+
     def make_inactive(self, request, queryset):
         updated = queryset.update(is_active=False)
         self.message_user(request, f'{updated}개 카테고리가 비활성화되었습니다.')

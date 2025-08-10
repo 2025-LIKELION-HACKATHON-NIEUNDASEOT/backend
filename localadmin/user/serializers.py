@@ -1,6 +1,8 @@
 from rest_framework import serializers
 from datetime import date
 from .models import User, Category, UserCategory, UserRegion, GenderChoices, RegionTypeChoices
+from region.models import Region
+from region.serializers import RegionSerializer
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -8,7 +10,7 @@ class CategorySerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Category
-        fields = ['id', 'category_id', 'category_name', 'is_active']
+        fields = ['id', 'category_name', 'is_active']
 
 
 class UserCategorySerializer(serializers.ModelSerializer):
@@ -23,10 +25,10 @@ class UserCategorySerializer(serializers.ModelSerializer):
 class UserRegionSerializer(serializers.ModelSerializer):
     # 사용자 관심 지역
     type_display = serializers.CharField(source='get_type_display', read_only=True)
-    
+    region       = RegionSerializer(read_only=True) 
     class Meta:
-        model = UserRegion
-        fields = ['id', 'region_id', 'type', 'type_display']
+        model  = UserRegion
+        fields = ['id', 'region', 'type', 'type_display']
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
@@ -103,25 +105,22 @@ class UserProfileUpdateSerializer(serializers.Serializer):
         return value
     
     def validate_regions(self, value):
-        # 지역 목록 검증
         if value:
             valid_types = [choice[0] for choice in RegionTypeChoices.choices]
-            
             for region_data in value:
                 if 'region_id' not in region_data:
                     raise serializers.ValidationError("각 지역 데이터에 region_id가 필요합니다.")
-                
                 if 'type' not in region_data:
                     raise serializers.ValidationError("각 지역 데이터에 type이 필요합니다.")
-                
                 if region_data['type'] not in valid_types:
                     raise serializers.ValidationError(
                         f"유효하지 않은 지역 타입: {region_data['type']}. "
                         f"가능한 값: {valid_types}"
                     )
-                
-                if not region_data['region_id'].strip():
-                    raise serializers.ValidationError("region_id는 빈 문자열일 수 없습니다.")
-            
-            return value
+                # 반드시 숫자 ID여야 함
+                if not isinstance(region_data['region_id'], int):
+                    raise serializers.ValidationError("region_id는 숫자(ID)여야 합니다.")
+                if not Region.objects.filter(id=region_data['region_id']).exists():
+                    raise serializers.ValidationError(f"존재하지 않는 지역 ID: {region_data['region_id']}")
+
         return value
