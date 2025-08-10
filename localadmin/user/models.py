@@ -1,5 +1,6 @@
 from django.db import models
 from django.core.validators import MinLengthValidator
+from region.models import Region
 
 class GenderChoices(models.TextChoices):
     # 성별 선택
@@ -62,21 +63,24 @@ class User(BaseTimeStampModel):
 
 
 class Category(models.Model):
-    # 카테고리 모델
-    category_id = models.CharField(
-        max_length=50,
-        unique=True,
-        verbose_name='카테고리ID'
-    )
     category_name = models.CharField(
-        max_length=64,
-        unique=True,
-        verbose_name='카테고리명'
+        max_length   = 64,
+        unique       = True,
+        verbose_name = '카테고리명'
     )
     is_active = models.BooleanField(
-        default=True,
-        verbose_name='활성화 여부'
+        default      = True,
+        verbose_name = '활성화 여부'
     )
+
+    class Meta:
+        db_table            = 'category'
+        verbose_name        = '카테고리'
+        verbose_name_plural = '카테고리들'
+        ordering            = ['category_name']
+
+    def __str__(self):
+        return self.category_name
 
     class Meta:
         db_table = 'category'
@@ -117,10 +121,10 @@ class UserRegion(models.Model):
         related_name='user_regions',
         verbose_name='사용자'
     )
-    # 추후 지역 관련 개발이 완료되면 field 연결 예정
-    region_id = models.CharField(
-        max_length=50,
-        verbose_name='지역ID'
+    region = models.ForeignKey(           
+        Region,
+        on_delete=models.CASCADE,
+        verbose_name='지역'
     )
     type = models.CharField(
         max_length=20,

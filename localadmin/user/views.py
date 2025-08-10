@@ -5,6 +5,7 @@ from rest_framework.response import Response
 from django.db import transaction
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
+from region.models import Region
 
 from .models import User, Category, UserCategory, UserRegion
 from .serializers import UserProfileSerializer, UserProfileUpdateSerializer
@@ -36,7 +37,9 @@ from .utils import (
     - birth: 생년월일 (YYYY-MM-DD)
     - gender: 성별 (M, F, OTHER)
     - category_ids: 관심 주제 ID 배열 (기존 데이터 전체 교체)
-    - regions: 관심 지역 배열 (기존 데이터 전체 교체)
+    - regions: 관심 지역 배열 (기존 데이터 전체 교체) 
+        - region_id만 입력해도 region 관련 모든 정보가 return됩니다.
+        - type은 "거주지"와 "관심지역"
     
     **주의사항:**
     - 관심 주제와 지역은 수정 시, 기존에 선택된 항목과 새로 선택된 항목을 모두 포함한 전체 배열로 전달해야 합니다.
@@ -44,8 +47,7 @@ from .utils import (
     
     **가능한 category_ids 목록:**
     - 왼쪽부터 순서대로 id 1, 2, 3... 입니다.
-    - TRANSPORT (교통), CULTURE (문화), HOUSING (주택), ECONOMY (경제), 
-    - ENVIRONMENT (환경), SAFETY (안전), WELFARE (복지), ADMINISTRATION (행정)
+    - 교통, 문화, 주택, 경제, 환경, 안전, 복지, 행정
     """,
     request_body=openapi.Schema(
         type=openapi.TYPE_OBJECT,
@@ -78,15 +80,23 @@ from .utils import (
                 items=openapi.Schema(
                     type=openapi.TYPE_OBJECT,
                     properties={
-                        'region_id': openapi.Schema(type=openapi.TYPE_STRING, example="SEOUL"),
-                        'type': openapi.Schema(type=openapi.TYPE_STRING, example="거주지", enum=["거주지", "관심지역"])
+                        'region_id': openapi.Schema(
+                            type=openapi.TYPE_INTEGER,
+                            example=2,
+                            description="Region 테이블의 PK(ID)"
+                        ),
+                        'type': openapi.Schema(
+                            type=openapi.TYPE_STRING,
+                            example="거주지",
+                            enum=["거주지", "관심지역"]
+                        )
                     }
                 ),
                 example=[
-                    {"region_id": "SEOUL", "type": "거주지"},
-                    {"region_id": "BUSAN", "type": "관심지역"}
+                    {"region_id": 2, "type": "거주지"},
+                    {"region_id": 5, "type": "관심지역"}
                 ],
-                description="관심 지역 배열"
+                description="관심 지역 배열 (Region 테이블 PK 기반)"
             )
         }
     ),
@@ -217,20 +227,19 @@ def _update_user_categories(user, category_ids):
 
 def _update_user_regions(user, regions):
     """사용자 관심 지역 업데이트"""
-    # 기존 관계 삭제
     UserRegion.objects.filter(user=user).delete()
-    
+
     if not regions:
         return
-    
-    # 새로운 관계 생성
+
     user_regions = []
     for region_data in regions:
+        region_obj = Region.objects.get(id=region_data['region_id'])
         user_region = UserRegion(
-            user=user,
-            region_id=region_data['region_id'],
-            type=region_data['type']
+            user   = user,
+            region = region_obj,
+            type   = region_data['type']
         )
         user_regions.append(user_region)
-    
+
     UserRegion.objects.bulk_create(user_regions)
