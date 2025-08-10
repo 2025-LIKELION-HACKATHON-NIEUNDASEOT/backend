@@ -10,8 +10,13 @@ env = environ.Env(
 )
 env.read_env(os.path.join(BASE_DIR, '.env'))
 
-DEBUG = True
+DEBUG = False
 SECRET_KEY = env('SECRET_KEY')
+
+# Gemini API 설정
+GEMINI_API_KEY = env('GEMINI_API_KEY')
+os.environ['GEMINI_API_KEY'] = GEMINI_API_KEY
+
 
 # 배포 서버
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=[

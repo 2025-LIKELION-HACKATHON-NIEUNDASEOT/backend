@@ -31,7 +31,9 @@ INSTALLED_APPS = [
     'storages',  
     
     'user',
-
+    'chatbot',
+    'scrap',
+    'document',
     'region',
 ]
 

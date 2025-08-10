@@ -2,47 +2,17 @@ from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
-from django.shortcuts import get_object_or_404
 from django.db import transaction
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 
 from .models import User, Category, UserCategory, UserRegion
 from .serializers import UserProfileSerializer, UserProfileUpdateSerializer
-
-
-# 하드코딩 게스트ID
-GUEST_USER_ID = "GUEST1"
-
-
-def _get_current_user():
-    # 설정된 게스트 사용자 조회
-    return get_object_or_404(
-        User.objects.prefetch_related('user_categories__category', 'user_regions'),
-        user_id=GUEST_USER_ID
-    )
-
-
-def _create_success_response(message, data=None):
-    # 성공 응답 생성 헬퍼
-    response_data = {
-        "success": True,
-        "message": message
-    }
-    if data is not None:
-        response_data["data"] = data
-    return response_data
-
-
-def _create_error_response(message, errors=None):
-    # 오류 응답 생성 헬퍼
-    response_data = {
-        "success": False,
-        "message": message
-    }
-    if errors is not None:
-        response_data["errors"] = errors
-    return response_data
+from .utils import (
+    get_current_user,
+    create_success_response,
+    create_error_response
+)
 
 
 @swagger_auto_schema(
@@ -73,6 +43,7 @@ def _create_error_response(message, errors=None):
     - 빈 배열을 전달하면 해당 데이터를 모두 삭제합니다.
     
     **가능한 category_ids 목록:**
+    - 왼쪽부터 순서대로 id 1, 2, 3... 입니다.
     - TRANSPORT (교통), CULTURE (문화), HOUSING (주택), ECONOMY (경제), 
     - ENVIRONMENT (환경), SAFETY (안전), WELFARE (복지), ADMINISTRATION (행정)
     """,
@@ -98,8 +69,8 @@ def _create_error_response(message, errors=None):
             ),
             'category_ids': openapi.Schema(
                 type=openapi.TYPE_ARRAY,
-                items=openapi.Schema(type=openapi.TYPE_STRING),
-                example=["TRANSPORT", "CULTURE", "ENVIRONMENT"],
+                items=openapi.Schema(type=openapi.TYPE_INTEGER),
+                example=[1, 2, 3],
                 description="관심 주제 카테고리 ID 배열"
             ),
             'regions': openapi.Schema(
@@ -129,7 +100,7 @@ def _create_error_response(message, errors=None):
 @api_view(['GET', 'PUT'])
 @permission_classes([AllowAny])
 def profile_view(request):
-    # 프로필 조회/수정을 처리하는 통합 뷰
+    """프로필 조회/수정을 처리하는 통합 뷰"""
     if request.method == 'GET':
         return _handle_get_profile(request)
     elif request.method == 'PUT':
@@ -137,65 +108,67 @@ def profile_view(request):
 
 
 def _handle_get_profile(request):
-    # GET 요청 처리 - 프로필 조회
+    """GET 요청 처리 - 프로필 조회"""
     try:
-        user = _get_current_user()
+        user       = get_current_user()
         serializer = UserProfileSerializer(user)
         
         return Response(
-            _create_success_response("프로필 조회 성공", serializer.data),
+            create_success_response("프로필 조회 성공", serializer.data),
             status=status.HTTP_200_OK
         )
         
     except User.DoesNotExist:
         return Response(
-            _create_error_response("프로필 조회 실패", "사용자를 찾을 수 없습니다."),
+            create_error_response("프로필 조회 실패", "사용자를 찾을 수 없습니다."),
             status=status.HTTP_404_NOT_FOUND
         )
     except Exception as e:
         return Response(
-            _create_error_response("프로필 조회 실패", "서버 내부 오류가 발생했습니다."),
+            create_error_response("프로필 조회 실패", "서버 내부 오류가 발생했습니다."),
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
 
+
 def _handle_update_profile(request):
-    # PUT 요청 처리 - 프로필 수정
+    """PUT 요청 처리 - 프로필 수정"""
     try:
-        user = _get_current_user()
+        user       = get_current_user()
         serializer = UserProfileUpdateSerializer(data=request.data)
         
         if not serializer.is_valid():
             return Response(
-                _create_error_response("프로필 수정 실패", serializer.errors),
+                create_error_response("프로필 수정 실패", serializer.errors),
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        updated_user = _update_user_profile(user, serializer.validated_data)
+        _update_user_profile(user, serializer.validated_data)
         
-        response_serializer = UserProfileSerializer(updated_user)
+        refreshed_user = get_current_user()
+        
+        response_serializer = UserProfileSerializer(refreshed_user)
         return Response(
-            _create_success_response("프로필 수정 성공", response_serializer.data),
+            create_success_response("프로필 수정 성공", response_serializer.data),
             status=status.HTTP_200_OK
         )
         
     except User.DoesNotExist:
         return Response(
-            _create_error_response("프로필 수정 실패", "사용자를 찾을 수 없습니다."),
+            create_error_response("프로필 수정 실패", "사용자를 찾을 수 없습니다."),
             status=status.HTTP_404_NOT_FOUND
         )
     except Exception as e:
         return Response(
-            _create_error_response("프로필 수정 실패", "서버 내부 오류가 발생했습니다."),
+            create_error_response("프로필 수정 실패", "서버 내부 오류가 발생했습니다."),
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
-
 @transaction.atomic
 def _update_user_profile(user, validated_data):
-    # 사용자 프로필 및 관련 데이터 업데이트
+    """사용자 프로필 및 관련 데이터 업데이트"""
     category_ids = validated_data.pop('category_ids', None)
-    regions = validated_data.pop('regions', None)
+    regions      = validated_data.pop('regions', None)
     
     for field, value in validated_data.items():
         setattr(user, field, value)
@@ -214,31 +187,36 @@ def _update_user_profile(user, validated_data):
 
 
 def _update_user_categories(user, category_ids):
-    # 사용자 관심 주제 업데이트
+    """사용자 관심 주제 업데이트"""
     # 기존 관계 삭제
     UserCategory.objects.filter(user=user).delete()
     
     if not category_ids:
         return
     
-    # 새로운 관계 생성
+    valid_ids = [
+        int(cid) for cid in category_ids
+        if str(cid).isdigit()
+    ]
+
+    if not valid_ids:
+        return
+
     categories = Category.objects.filter(
-        category_id__in=category_ids,
+        id__in=valid_ids,
         is_active=True
     )
-    
-    user_categories = []
-    for category in categories:
-        user_category = UserCategory(
-            user=user,
-            category=category
-        )
-        user_categories.append(user_category)
+
+    user_categories = [
+        UserCategory(user=user, category=category)
+        for category in categories
+    ]
     
     UserCategory.objects.bulk_create(user_categories)
 
+
 def _update_user_regions(user, regions):
-    # 사용자 관심 지역 업데이트
+    """사용자 관심 지역 업데이트"""
     # 기존 관계 삭제
     UserRegion.objects.filter(user=user).delete()
     

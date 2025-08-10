@@ -13,11 +13,14 @@ if os.path.exists(env_file):
 else:
     raise ImproperlyConfigured(".env.local 파일을 찾을 수 없습니다. 프로젝트 루트에 생성해 주세요.")
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
 
-# SECURITY WARNING: keep the secret key used in production secret!
+DEBUG = True
 SECRET_KEY = env('SECRET_KEY')
+
+# Gemini API 설정
+GEMINI_API_KEY = env('GEMINI_API_KEY')
+os.environ['GEMINI_API_KEY'] = GEMINI_API_KEY
+
 
 ALLOWED_HOSTS = ['*']
 
