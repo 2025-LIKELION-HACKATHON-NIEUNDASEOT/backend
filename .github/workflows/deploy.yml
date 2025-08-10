@@ -23,10 +23,11 @@ jobs:
         script: |
           cd /home/ubuntu/Villit_BE
           git pull origin main
-          cd localadmin
           source venv/bin/activate
           pip install -r requirements.txt
+          export DJANGO_ENV=production
           export DJANGO_SETTINGS_MODULE=localadmin.settings.production
+          cd localadmin
           python manage.py migrate
           python manage.py create_initial_data --force
           python manage.py collectstatic --noinput
