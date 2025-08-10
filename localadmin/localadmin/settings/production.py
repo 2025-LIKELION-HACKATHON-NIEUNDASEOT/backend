@@ -2,21 +2,17 @@
 배포 환경 설정
 """
 from .base import *
-import environ
+from django.core.exceptions import ImproperlyConfigured
 
-# django-environ
-env = environ.Env(
-    DEBUG=(bool, False)
-)
-env.read_env(os.path.join(BASE_DIR, '.env'))
+# 배포 환경용 .env 파일 로드
+if not load_env_file('.env'):
+    raise ImproperlyConfigured(".env 파일을 찾을 수 없습니다. 배포 서버에 .env 파일을 생성해 주세요.")
+
+# 공통 환경변수 설정
+setup_common_env_vars()
 
 DEBUG = False
 SECRET_KEY = env('SECRET_KEY')
-
-# Gemini API 설정
-GEMINI_API_KEY = env('GEMINI_API_KEY')
-os.environ['GEMINI_API_KEY'] = GEMINI_API_KEY
-
 
 # 배포 서버
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=[
@@ -57,10 +53,7 @@ CORS_ALLOWED_ORIGINS = env.list('CORS_ALLOWED_ORIGINS', default=[
 ])
 
 # Swagger
-SWAGGER_SETTINGS = {
-    'USE_SESSION_AUTH': False,
-    'DEFAULT_API_URL': 'https://villit.o-r.kr'
-}
+SWAGGER_SETTINGS['DEFAULT_API_URL'] = 'https://villit.o-r.kr'
 
 # 보안
 SECURE_SSL_REDIRECT = env.bool('SECURE_SSL_REDIRECT', default=False)  

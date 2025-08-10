@@ -2,30 +2,21 @@
 개발 환경 설정
 """
 from .base import *
-from environ import Env as Environ
 from django.core.exceptions import ImproperlyConfigured
 
-# django-environ
-env = Environ()
-env_file = os.path.join(BASE_DIR, '.env.local')
-if os.path.exists(env_file):
-    env.read_env(env_file)
-else:
+# 개발 환경용 .env.local 파일 로드
+if not load_env_file('.env.local'):
     raise ImproperlyConfigured(".env.local 파일을 찾을 수 없습니다. 프로젝트 루트에 생성해 주세요.")
 
+# 공통 환경변수 설정
+setup_common_env_vars()
 
 DEBUG = True
 SECRET_KEY = env('SECRET_KEY')
 
-# Gemini API 설정
-GEMINI_API_KEY = env('GEMINI_API_KEY')
-os.environ['GEMINI_API_KEY'] = GEMINI_API_KEY
-
-
 ALLOWED_HOSTS = ['*']
 
 # Database
-# .env.local
 DATABASES = {
     'default': env.db_url('DATABASE_URL')
 }

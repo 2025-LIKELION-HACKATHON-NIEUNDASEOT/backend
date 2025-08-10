@@ -3,10 +3,16 @@
 import os
 import sys
 
-
 def main():
     """Run administrative tasks."""
-    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'localadmin.settings')
+    # 환경 변수가 설정되어 있지 않으면 기본값으로 development 사용
+    django_env = os.environ.get('DJANGO_ENV', 'development')
+    
+    if django_env == 'production':
+        os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'localadmin.settings.production')
+    else:
+        os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'localadmin.settings.development')
+    
     try:
         from django.core.management import execute_from_command_line
     except ImportError as exc:
@@ -15,8 +21,8 @@ def main():
             "available on your PYTHONPATH environment variable? Did you "
             "forget to activate a virtual environment?"
         ) from exc
+    
     execute_from_command_line(sys.argv)
-
 
 if __name__ == '__main__':
     main()

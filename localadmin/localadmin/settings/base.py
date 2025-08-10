@@ -1,20 +1,39 @@
-"""
-Django settings for localadmin project.
-Base configuration - 모든 환경에서 공통으로 사용
-"""
-
 from pathlib import Path
 import os
-from dotenv import load_dotenv # sgis 키 - .env.local 파일 로드
+import environ
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
-# sgis 키 - .env.local 파일 로드
-load_dotenv(dotenv_path=os.path.join(BASE_DIR, '.env.local'))
+# django-environ 초기화 (모든 환경에서 공통 사용)
+env = environ.Env(
+    DEBUG=(bool, False)
+)
 
-SGIS_CONSUMER_KEY = os.getenv('SGIS_CONSUMER_KEY')
-SGIS_CONSUMER_SECRET = os.getenv('SGIS_CONSUMER_SECRET')
+# 환경별 .env 파일 로드 (각 환경 설정에서 호출)
+def load_env_file(env_filename):
+    """환경에 맞는 .env 파일 로드"""
+    env_file = os.path.join(BASE_DIR, env_filename)
+    if os.path.exists(env_file):
+        env.read_env(env_file)
+        return True
+    return False
+
+
+# 공통 환경변수 설정 (모든 환경에서 사용)
+def setup_common_env_vars():
+    """공통 환경변수들을 설정"""
+    # SGIS 키 설정
+    global SGIS_CONSUMER_KEY, SGIS_CONSUMER_SECRET, GEMINI_API_KEY
+    
+    SGIS_CONSUMER_KEY = env('SGIS_CONSUMER_KEY', default=None)
+    SGIS_CONSUMER_SECRET = env('SGIS_CONSUMER_SECRET', default=None)
+    
+    # Gemini API 설정
+    GEMINI_API_KEY = env('GEMINI_API_KEY', default=None)
+    if GEMINI_API_KEY:
+        os.environ['GEMINI_API_KEY'] = GEMINI_API_KEY
+
 
 # Application definition
 INSTALLED_APPS = [
@@ -114,6 +133,3 @@ SWAGGER_SETTINGS = {
         'patch'
     ],
 }
-
-load_dotenv() # sgis 키 - .env 파일 로드
-
