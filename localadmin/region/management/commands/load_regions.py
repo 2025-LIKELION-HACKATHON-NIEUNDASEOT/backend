@@ -10,8 +10,8 @@ class Command(BaseCommand):
         # SGIS API 인증 토큰
         auth_url = 'https://sgisapi.kostat.go.kr/OpenAPI3/auth/authentication.json'
         payload = {
-            'consumer_key': '9454e3b5d66f4e0682b9',
-            'consumer_secret': '1b7facdcb67a4ed99708' #
+            'consumer_key': settings.SGIS_CONSUMER_KEY,
+            'consumer_secret': settings.SGIS_CONSUMER_SECRET # .env.local에 저장된 키
         }
         response = requests.get(auth_url, params=payload)
         response.raise_for_status()

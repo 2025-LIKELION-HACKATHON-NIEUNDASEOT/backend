@@ -5,9 +5,16 @@ Base configuration - 모든 환경에서 공통으로 사용
 
 from pathlib import Path
 import os
+from dotenv import load_dotenv # sgis 키 - .env.local 파일 로드
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
+
+# sgis 키 - .env.local 파일 로드
+load_dotenv(dotenv_path=os.path.join(BASE_DIR, '.env.local'))
+
+SGIS_CONSUMER_KEY = os.getenv('SGIS_CONSUMER_KEY')
+SGIS_CONSUMER_SECRET = os.getenv('SGIS_CONSUMER_SECRET')
 
 # Application definition
 INSTALLED_APPS = [
@@ -105,3 +112,6 @@ SWAGGER_SETTINGS = {
         'patch'
     ],
 }
+
+load_dotenv() # sgis 키 - .env 파일 로드
+
