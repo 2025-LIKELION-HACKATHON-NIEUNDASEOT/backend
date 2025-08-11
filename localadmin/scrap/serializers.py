@@ -1,6 +1,7 @@
 from rest_framework           import serializers
-from .models                  import ChatbotScrap
-from document.models          import Category
+from .models                  import ChatbotScrap, DocumentScrap
+from document.models          import Category, Document, DocumentTypeChoices
+from region.models            import Region
 
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
@@ -100,3 +101,84 @@ class ChatbotScrapListSerializer(serializers.ModelSerializer):
                 'title': obj.chatbot_session.title
             }
         return None
+
+class RegionSimpleSerializer(serializers.ModelSerializer):
+    full_name = serializers.SerializerMethodField()
+    
+    class Meta:
+        model  = Region
+        fields = ['id', 'city', 'district', 'full_name']
+    
+    def get_full_name(self, obj):
+        if obj.district:
+            return f"{obj.city} {obj.district}"
+        return obj.city
+
+
+class DocumentScrapListSerializer(serializers.ModelSerializer):
+    # 공문 스크랩 목록
+    doc_title        = serializers.CharField(source='document.doc_title', read_only=True)
+    doc_type         = serializers.CharField(source='document.doc_type', read_only=True)
+    doc_type_display = serializers.CharField(source='document.get_doc_type_display', read_only=True)
+    pub_date         = serializers.DateTimeField(source='document.pub_date', read_only=True)
+    region           = serializers.SerializerMethodField()
+    categories       = serializers.SerializerMethodField()
+    
+    class Meta:
+        model  = DocumentScrap
+        fields = [
+            'id', 'doc_title', 'doc_type', 'doc_type_display', 
+            'pub_date', 'region', 'categories', 'created_at'
+        ]
+    
+    def get_region(self, obj):
+        try:
+            region = Region.objects.get(id=obj.document.region_id)
+            return RegionSimpleSerializer(region).data
+        except Region.DoesNotExist:
+            return None
+    
+    def get_categories(self, obj):
+        return CategorySerializer(obj.document.categories.all(), many=True).data
+
+
+class DocumentScrapCreateSerializer(serializers.Serializer):
+    # 공문 스크랩 생성
+    document_id = serializers.IntegerField(help_text="스크랩할 공문 ID")
+    
+    def validate_document_id(self, value):
+        try:
+            document = Document.objects.get(id=value, is_active=True)
+            return value
+        except Document.DoesNotExist:
+            raise serializers.ValidationError("존재하지 않거나 비활성화된 공문입니다.")
+
+
+class DocumentScrapSerializer(serializers.ModelSerializer):
+    # 공문 스크랩 상세
+    doc_title        = serializers.CharField(source='document.doc_title', read_only=True)
+    doc_type         = serializers.CharField(source='document.doc_type', read_only=True)
+    doc_type_display = serializers.CharField(source='document.get_doc_type_display', read_only=True)
+    pub_date         = serializers.DateTimeField(source='document.pub_date', read_only=True)
+    region           = serializers.SerializerMethodField()
+    categories       = serializers.SerializerMethodField()
+    user_name        = serializers.CharField(source='user.name', read_only=True)
+    
+    class Meta:
+        model  = DocumentScrap
+        fields = [
+            'id', 'user', 'user_name', 'document', 'doc_title', 
+            'doc_type', 'doc_type_display', 'pub_date', 'region', 
+            'categories', 'created_at'
+        ]
+        read_only_fields = ['user', 'document']
+    
+    def get_region(self, obj):
+        try:
+            region = Region.objects.get(id=obj.document.region_id)
+            return RegionSimpleSerializer(region).data
+        except Region.DoesNotExist:
+            return None
+    
+    def get_categories(self, obj):
+        return CategorySerializer(obj.document.categories.all(), many=True).data
