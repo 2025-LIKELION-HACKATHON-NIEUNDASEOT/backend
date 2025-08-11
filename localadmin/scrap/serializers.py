@@ -123,12 +123,13 @@ class DocumentScrapListSerializer(serializers.ModelSerializer):
     pub_date         = serializers.DateTimeField(source='document.pub_date', read_only=True)
     region           = serializers.SerializerMethodField()
     categories       = serializers.SerializerMethodField()
-    
+    image_url        = serializers.CharField(source='document.image_url', read_only=True)
+
     class Meta:
         model  = DocumentScrap
         fields = [
             'id', 'doc_title', 'doc_type', 'doc_type_display', 
-            'pub_date', 'region', 'categories', 'created_at'
+            'pub_date', 'region', 'categories', 'image_url', 'created_at'
         ]
     
     def get_region(self, obj):
@@ -163,13 +164,14 @@ class DocumentScrapSerializer(serializers.ModelSerializer):
     region           = serializers.SerializerMethodField()
     categories       = serializers.SerializerMethodField()
     user_name        = serializers.CharField(source='user.name', read_only=True)
-    
+    image_url        = serializers.CharField(source='document.image_url', read_only=True)
+
     class Meta:
         model  = DocumentScrap
         fields = [
             'id', 'user', 'user_name', 'document', 'doc_title', 
             'doc_type', 'doc_type_display', 'pub_date', 'region', 
-            'categories', 'created_at'
+            'categories', 'image_url', 'created_at'
         ]
         read_only_fields = ['user', 'document']
     

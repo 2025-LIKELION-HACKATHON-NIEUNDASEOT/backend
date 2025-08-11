@@ -57,6 +57,13 @@ class Document(BaseTimeStampModel):
         blank        = True,
         verbose_name = '카테고리'
     )
+    image_url   = models.CharField(
+        max_length   = 1024,
+        null         = True,
+        blank        = True,
+        verbose_name = '이미지 URL',
+        help_text   = '이미지 파일 URL 또는 경로'
+    )
 
     class Meta:
         db_table             = 'document'

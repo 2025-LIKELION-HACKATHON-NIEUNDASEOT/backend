@@ -397,6 +397,7 @@ def scrap_detail(request, scrap_id):
                                         "category_name": "교통"
                                     }
                                 ],
+                                "image_url": "/media/document/2025/08/11/sample.jpg",
                                 "created_at": "2025-08-11T20:51:31.793230+09:00"
                             }
                         ]
@@ -485,6 +486,7 @@ def scrap_detail(request, scrap_id):
                                 "category_name": "교통"
                             }
                         ],
+                        "image_url": "/media/document/2025/08/11/sample.jpg",
                         "created_at": "2025-08-11T20:51:31.793230+09:00"
                     }
                 }
@@ -513,12 +515,12 @@ def handle_document_scrap_list(request):
             'document__categories'
         )
 
-        # 1차 필터: 공문 타입 (단일 선택)
+        # 공문 타입
         doc_type = request.GET.get('doc_type')
         if doc_type and doc_type in dict(DocumentTypeChoices.choices):
             queryset = queryset.filter(document__doc_type=doc_type)
 
-        # 2차 필터: 지역 (다중 선택, OR 조건)
+        # 지역
         region_ids_param = request.GET.get('region_ids')
         if region_ids_param:
             region_id_list = [
@@ -531,7 +533,7 @@ def handle_document_scrap_list(request):
                     document__region_id__in=region_id_list
                 )
 
-        # 2차 필터: 카테고리 (다중 선택, OR 조건)
+        # 카테고리 
         category_ids_param = request.GET.get('category_ids')
         if category_ids_param:
             category_id_list = [
@@ -544,14 +546,12 @@ def handle_document_scrap_list(request):
                     document__categories__id__in=category_id_list
                 ).distinct()
 
-        # 정렬
         order = request.GET.get('order', 'latest')
         if order == 'oldest':
             queryset = queryset.order_by('created_at')
         else:
             queryset = queryset.order_by('-created_at')
 
-        # 페이지네이션
         page      = int(request.GET.get('page', 1))
         page_size = int(request.GET.get('page_size', 10))
         start     = (page - 1) * page_size

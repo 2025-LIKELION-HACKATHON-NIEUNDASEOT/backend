@@ -49,7 +49,7 @@ class DocumentScrapAdmin(admin.ModelAdmin):
     """공문 스크랩 관리자"""
     list_display = [
         'id', 'get_user_name', 'get_document_title', 
-        'get_document_type', 'created_at'
+        'get_document_type', 'get_image_url', 'created_at'
     ]
     list_filter = [
         'document__doc_type', 'created_at', 
@@ -78,3 +78,7 @@ class DocumentScrapAdmin(admin.ModelAdmin):
         return obj.document.get_doc_type_display()
     get_document_type.short_description = '공문 타입'
     get_document_type.admin_order_field = 'document__doc_type'
+    
+    def get_image_url(self, obj):
+        return obj.document.image_url
+    get_image_url.short_description = '이미지 URL'
