@@ -2,11 +2,12 @@ from django.db        import models
 from user.models      import User, BaseTimeStampModel
 from document.models  import Category
 from chatbot.models   import ChatbotSession, ChatbotMessage, SpeakerChoices
+from document.models  import Document
 from django.core.exceptions import ValidationError
 
 
 class ChatbotScrap(BaseTimeStampModel):
-    """챗봇 스크랩 모델 (카테고리 다중)"""
+    """챗봇 스크랩 모델"""
     id               = models.AutoField(
         primary_key  = True,
         verbose_name = '챗봇 스크랩 ID'
@@ -67,3 +68,34 @@ class ChatbotScrap(BaseTimeStampModel):
 
     def __str__(self):
         return f"{self.user.name}의 스크랩"
+
+class DocumentScrap(BaseTimeStampModel):
+    """공문 스크랩 모델"""
+    id = models.AutoField(
+        primary_key  = True,
+        db_column    = 'document_scrap_id',
+        verbose_name = '공문 스크랩 ID'
+    )
+    user = models.ForeignKey(
+        User,
+        on_delete      = models.CASCADE,
+        db_column      = 'user_id',
+        related_name   = 'document_scraps',
+        verbose_name   = '사용자'
+    )
+    document = models.ForeignKey(
+        Document,
+        on_delete      = models.CASCADE,
+        db_column      = 'document_id',
+        related_name   = 'scraps',
+        verbose_name   = '공문'
+    )
+
+    class Meta:
+        db_table             = 'document_scrap'
+        verbose_name         = '공문 스크랩'
+        verbose_name_plural  = '공문 스크랩들'
+        unique_together      = ('user', 'document')
+
+    def __str__(self):
+        return f"{self.user.name}의 스크랩 - {self.document.doc_title}"

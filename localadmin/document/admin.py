@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models         import Document, DocumentScrap
+from .models         import Document
 
 
 @admin.register(Document)
@@ -68,45 +68,3 @@ class DocumentAdmin(admin.ModelAdmin):
         # 공문의 모든 카테고리 이름을 쉼표로 연결해서 반환 
         return ", ".join([c.category_name for c in obj.categories.all()])
     get_categories.short_description = '카테고리'
-
-
-@admin.register(DocumentScrap)
-class DocumentScrapAdmin(admin.ModelAdmin):
-    """공문 스크랩 관리자"""
-
-    list_display     = [
-        'id',
-        'get_user_name',
-        'get_document_title',
-        'get_document_type',
-        'get_document_categories'    
-    ]
-    list_filter      = [
-        'document__doc_type',
-        'document__categories'     
-    ]
-    search_fields    = [
-        'user__name',
-        'user__user_id',
-        'document__doc_title'
-    ]
-    ordering         = ['-id']
-    readonly_fields  = ['id']
-
-    def get_user_name(self, obj):
-        return f"{obj.user.name} ({obj.user.user_id})"
-    get_user_name.short_description = '사용자'
-
-    def get_document_title(self, obj):
-        title = obj.document.doc_title
-        return title[:50] + '...' if len(title) > 50 else title
-    get_document_title.short_description = '공문 제목'
-
-    def get_document_type(self, obj):
-        return obj.document.get_doc_type_display()
-    get_document_type.short_description = '공문 타입'
-
-    def get_document_categories(self, obj):
-        categories = obj.document.categories.all()
-        return ", ".join([c.category_name for c in categories])
-    get_document_categories.short_description = '카테고리'

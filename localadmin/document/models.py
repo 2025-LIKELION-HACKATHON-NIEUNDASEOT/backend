@@ -57,6 +57,13 @@ class Document(BaseTimeStampModel):
         blank        = True,
         verbose_name = '카테고리'
     )
+    image_url   = models.CharField(
+        max_length   = 1024,
+        null         = True,
+        blank        = True,
+        verbose_name = '이미지 URL',
+        help_text   = '이미지 파일 URL 또는 경로'
+    )
 
     class Meta:
         db_table             = 'document'
@@ -66,35 +73,3 @@ class Document(BaseTimeStampModel):
 
     def __str__(self):
         return f"[{self.get_doc_type_display()}] {self.doc_title}"
-
-
-class DocumentScrap(BaseTimeStampModel):
-    """공문 스크랩 모델"""
-    id = models.AutoField(
-        primary_key  = True,
-        db_column    = 'document_scrap_id',
-        verbose_name = '공문 스크랩 ID'
-    )
-    user = models.ForeignKey(
-        User,
-        on_delete      = models.CASCADE,
-        db_column      = 'user_id',
-        related_name   = 'document_scraps',
-        verbose_name   = '사용자'
-    )
-    document = models.ForeignKey(
-        Document,
-        on_delete      = models.CASCADE,
-        db_column      = 'document_id',
-        related_name   = 'scraps',
-        verbose_name   = '공문'
-    )
-
-    class Meta:
-        db_table             = 'document_scrap'
-        verbose_name         = '공문 스크랩'
-        verbose_name_plural  = '공문 스크랩들'
-        unique_together      = ('user', 'document')
-
-    def __str__(self):
-        return f"{self.user.name}의 스크랩 - {self.document.doc_title}"
