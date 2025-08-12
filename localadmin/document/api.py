@@ -33,7 +33,7 @@ def fetch_notices_for_user(user, start_index=1, end_index=5):
     if hasattr(user, 'profile'):
         region = getattr(user.profile, 'region', None)
         if isinstance(region, dict) and region.get('city') == '경기도':
-            api_name = 'GyeonggiNewsNoticeList'  # 예시, 실제 API명 맞게 수정 필요
+            api_name = 'GyeonggiNewsNoticeList'
     
     url = f"http://openapi.seoul.go.kr:8088/{key}/xml/{api_name}/{start_index}/{end_index}/"
     print(f"API 요청 URL: {url}")  # <== 이 줄 추가
