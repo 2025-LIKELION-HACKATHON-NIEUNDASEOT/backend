@@ -4,7 +4,6 @@ from .models         import Document
 
 @admin.register(Document)
 class DocumentAdmin(admin.ModelAdmin):
-    """공문 관리자"""
 
     list_display     = [
         'id',

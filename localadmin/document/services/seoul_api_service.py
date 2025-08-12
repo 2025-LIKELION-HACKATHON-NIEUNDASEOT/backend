@@ -187,7 +187,6 @@ class DocumentDataProcessor:
                 department = item.get('DEPT_NM', item.get('CHARGER_DEPT_NM', ''))
                 link_url = item.get('LINK_URL', item.get('DTL_LINK', ''))
                 
-                # 데이터 검증
                 if not title or not content:
                     continue
                 
@@ -197,13 +196,11 @@ class DocumentDataProcessor:
                 # 카테고리 추출
                 category_names = cls.extract_categories_from_content(title, content)
                 
-                # 날짜 파싱
                 parsed_date = cls.parse_date(pub_date)
                 
-                # 마감일 추출 (참여형인 경우)
+                # 마감일 추출 (참여형only)
                 deadline = None
                 if doc_type == DocumentTypeChoices.PARTICIPATION:
-                    # 내용에서 마감일 추출 로직 (정규식 등 활용)
                     deadline_str = cls.extract_deadline_from_content(content)
                     if deadline_str:
                         deadline = cls.parse_date(deadline_str)
@@ -231,7 +228,6 @@ class DocumentDataProcessor:
     
     @staticmethod
     def extract_deadline_from_content(content):
-        """내용에서 마감일 추출 (정규식 활용)"""
         import re
         
         # 마감일 패턴들
@@ -251,11 +247,8 @@ class DocumentDataProcessor:
 
 
 class DocumentService:
-    """Document 모델 관련 비즈니스 로직"""
-    
     @staticmethod
     def get_or_create_category(name):
-        """카테고리 조회 또는 생성"""
         category, created = Category.objects.get_or_create(
             name=name,
             defaults={'description': f'{name} 관련 공문'}
@@ -271,10 +264,8 @@ class DocumentService:
         
         for doc_data in processed_documents:
             try:
-                # 카테고리 이름 분리
                 category_names = doc_data.pop('category_names', [])
                 
-                # Document 인스턴스 생성 (중복 체크)
                 existing_doc = Document.objects.filter(
                     title=doc_data['title'],
                     region_id=doc_data['region_id'],
@@ -285,10 +276,8 @@ class DocumentService:
                     logger.info(f"Document already exists: {doc_data['title']}")
                     continue
                 
-                # 새 문서 생성
                 document = Document.objects.create(**doc_data)
                 
-                # 카테고리 연결
                 for category_name in category_names:
                     category = cls.get_or_create_category(category_name)
                     document.categories.add(category)
@@ -313,16 +302,16 @@ class DocumentService:
             # API 데이터 조회
             api_data = api_service.fetch_documents_from_api(
                 service_name=service_name,
-                region_code=None,  # 필요시 지역코드 매핑
+                region_code=None,
                 start_idx=1,
-                end_idx=1000  # 필요에 따라 조정
+                end_idx=1000
             )
             
             if not api_data:
                 logger.warning("No data received from Seoul API")
                 return []
             
-            # 데이터 처리
+            # 전처리
             processed_documents = DocumentDataProcessor.process_seoul_api_data(
                 api_data, region_id
             )

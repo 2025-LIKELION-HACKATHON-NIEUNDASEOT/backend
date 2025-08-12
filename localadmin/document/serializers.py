@@ -10,7 +10,7 @@ class CategorySerializer(serializers.ModelSerializer):
 
 
 class DocumentListSerializer(serializers.ModelSerializer):
-    """목록용 시리얼라이저 - 기능명세서 기준"""
+    # 목록용
     categories = CategorySerializer(many=True, read_only=True)
     doc_type_display = serializers.CharField(source='get_doc_type_display', read_only=True)
     has_deadline = serializers.SerializerMethodField()
@@ -29,7 +29,7 @@ class DocumentListSerializer(serializers.ModelSerializer):
 
 
 class DocumentSerializer(serializers.ModelSerializer):
-    """상세 조회용 시리얼라이저"""
+    # 상세 조회
     categories = CategorySerializer(many=True, read_only=True)
     doc_type_display = serializers.CharField(source='get_doc_type_display', read_only=True)
     days_until_deadline = serializers.SerializerMethodField()
@@ -44,7 +44,7 @@ class DocumentSerializer(serializers.ModelSerializer):
         ]
     
     def get_days_until_deadline(self, obj):
-        """마감일까지 남은 일수 (참여형 공문용)"""
+        # 마감일
         if not obj.dead_date:
             return None
         

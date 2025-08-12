@@ -9,7 +9,6 @@ urlpatterns = [
     path('', views.DocumentListView.as_view(), name='document_list'),
     path('<int:pk>/', views.DocumentDetailView.as_view(), name='document_detail'),
     
-    # 기능명세서 기준 특별 조회
     path('region/<int:region_id>/recent/', views.get_recent_region_news, name='recent_region_news'),
     path('categories/recent-alerts/', views.get_recent_category_alerts, name='recent_category_alerts'),
 ]

@@ -20,7 +20,6 @@ def get_openapi_key_for_user(user):
     region = None
     if hasattr(user, 'profile'):
         region = getattr(user.profile, 'region', None)
-        # region이 dict 형식일 경우 city 키 확인
         if isinstance(region, dict):
             city = region.get('city')
             if city == '경기도':
@@ -30,7 +29,6 @@ def get_openapi_key_for_user(user):
 
 def fetch_notices_for_user(user, start_index=1, end_index=5):
     key = get_openapi_key_for_user(user)
-    # API 이름은 region에 따라 자동 결정
     api_name = 'DobongNewsNoticeList'
     if hasattr(user, 'profile'):
         region = getattr(user.profile, 'region', None)
@@ -89,7 +87,6 @@ def classify_doc_type(title, content):
     }
 
 def save_notices_to_db(notices, user):
-    # region_id 매핑 안전하게 처리
     region = None
     if hasattr(user, 'profile'):
         region = getattr(user.profile, 'region', None)
@@ -108,7 +105,7 @@ def save_notices_to_db(notices, user):
         'ggyeongi': 7,
         'gyeonggi': 7,
     }
-    region_id = region_map.get(region_name, 2)  # 기본 2
+    region_id = region_map.get(region_name, 2)
 
     for notice in notices:
         try:
@@ -140,7 +137,7 @@ def save_notices_to_db(notices, user):
 def update_user_documents(user, start=1, end=5):
     print(f"update_user_documents 시작: user={user}")
     xml_data = fetch_notices_for_user(user, start, end)
-    print(f"fetch_notices_for_user 결과(원본 XML):\n{xml_data[:500]}")  # 일부만 출력
+    print(f"fetch_notices_for_user 결과(원본 XML):\n{xml_data[:500]}")
     notices = parse_notices(xml_data)
     print(f"파싱된 공지 개수: {len(notices)}")
     if len(notices) == 0:

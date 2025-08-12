@@ -18,10 +18,10 @@ class Command(BaseCommand):
             gyeonggi_region = Region.objects.filter(city='경기도').first()
             
             if not gyeonggi_region:
-                self.stderr.write(self.style.ERROR("`city`가 '경기도'인 Region 객체를 찾을 수 없습니다. DB에 '경기도'를 먼저 추가해주세요."))
+                # self.stderr.write(self.style.ERROR("`city`가 '경기도'인 Region 객체를 찾을 수 없습니다. DB에 '경기도'를 먼저 추가해주세요."))
                 return
         except Exception as e:
-            self.stderr.write(self.style.ERROR(f"Region 객체 조회 중 오류 발생: {e}"))
+            # self.stderr.write(self.style.ERROR(f"Region 객체 조회 중 오류 발생: {e}"))
             return
 
         api_service = GyeonggiAPIService(api_key=settings.GYEONGGI_OPENAPI_KEY)
@@ -30,9 +30,6 @@ class Command(BaseCommand):
         
         total_created_count = 0
         
-        # pSize를 100으로 설정하고, pIndex를 1부터 10씩 증가시키는 방식으로 변경
-        # 이렇게 하면 한 번에 많은 데이터를 가져올 수 있습니다.
-        # API 정책에 따라 유연하게 조정 가능
         for pIndex in range(1, 100, 10):
             try:
                 api_data = api_service.fetch_documents_from_api(
@@ -42,7 +39,7 @@ class Command(BaseCommand):
                 )
                 
                 if not api_data:
-                    self.stdout.write(self.style.WARNING(f"인덱스 {pIndex}부터 {pIndex + 9}까지 데이터가 없습니다. 중단합니다."))
+                    # 테스트용 self.stdout.write(self.style.WARNING(f"인덱스 {pIndex}부터 {pIndex + 9}까지 데이터가 없습니다. 중단합니다."))
                     break
                 
                 processed_docs = processor.process_gyeonggi_api_data(

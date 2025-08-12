@@ -11,11 +11,10 @@ logger = logging.getLogger(__name__)
 
 
 class DocumentService:
-    """공문 데이터 관리 서비스"""
+    #공문 데이터 관리 서비스
     
     @staticmethod
     def create_document(document_data: Dict[str, Any]) -> Document:
-        """단일 공문 생성"""
         try:
             with transaction.atomic():
                 categories_data = document_data.pop('categories', [])
@@ -33,7 +32,6 @@ class DocumentService:
     
     @staticmethod
     def bulk_create_documents(documents_data: List[Dict[str, Any]]) -> List[Document]:
-        """여러 공문 일괄 생성"""
         created_documents = []
         
         try:
@@ -60,7 +58,6 @@ class DocumentService:
     
     @staticmethod
     def _is_duplicate(document_data: Dict[str, Any]) -> bool:
-        """중복 공문 체크"""
         return Document.objects.filter(
             doc_title=document_data.get('doc_title'),
             region_id=document_data.get('region_id'),
@@ -69,9 +66,9 @@ class DocumentService:
 
 
 class DocumentDataProcessor:
-    """API에서 가져온 데이터를 Document 모델에 맞게 변환하는 프로세서"""
+    #api에서 가져온 데이터를 Document 모델에 맞게 변환
     
-    # 기능명세서 기준 4가지 타입 매핑
+    # 기능명세서 기준 4가지 타입
     TYPE_MAPPING = {
         '참여': DocumentTypeChoices.PARTICIPATION,  # 참여 유도형 (행사, 설문)
         '공지': DocumentTypeChoices.NOTICE,          # 공지형 (행정제도 안내, 통보)
@@ -82,16 +79,14 @@ class DocumentDataProcessor:
     
     @staticmethod
     def process_api_data(api_data: Dict[str, Any], region_id: int) -> Dict[str, Any]:
-        """API 데이터를 Document 모델 형식으로 변환"""
+        # API 데이터 > Document 모델 형식으로 변환
         try:
-            # 경기도 API 필드명 매핑
             doc_title = api_data.get('ROW_TITLE', api_data.get('title', ''))
             doc_content = api_data.get('ROW_CONTENT', api_data.get('content', ''))
             pub_date = DocumentDataProcessor._parse_date(api_data.get('ROW_DATE', api_data.get('pub_date', '')))
             department = api_data.get('ROW_DEPT', api_data.get('department', ''))
             link_url = api_data.get('ROW_URL', api_data.get('link_url', ''))
 
-            # 다른 API들의 필드명도 유연하게 처리하도록 보강
             if not doc_title:
                 doc_title = api_data.get('doc_title', '')
             if not doc_content:
@@ -112,19 +107,19 @@ class DocumentDataProcessor:
                 'link_url': link_url
             }
             
-            # 4가지 타입으로 분류 (기능명세서 기준)
+            # 4가지 타입 분류
             processed_data['doc_type'] = DocumentDataProcessor._determine_doc_type(
                 api_data.get('category', ''),
                 processed_data['doc_title']
             )
             
-            # 참여형 문서의 마감일 처리
+            # 마감일
             if processed_data['doc_type'] == DocumentTypeChoices.PARTICIPATION:
                 processed_data['dead_date'] = DocumentDataProcessor._parse_date(
                     api_data.get('deadline', api_data.get('dead_date', ''))
                 )
             
-            # 카테고리 처리
+            # 카테고리
             processed_data['categories'] = DocumentDataProcessor._get_categories(
                 api_data.get('category', ''),
                 processed_data['department']
@@ -138,7 +133,6 @@ class DocumentDataProcessor:
 
     @staticmethod
     def _parse_date(date_string: Any) -> Optional[timezone.datetime]:
-        """날짜 문자열 파싱"""
         if not date_string:
             return None
             
@@ -162,16 +156,11 @@ class DocumentDataProcessor:
     
     @staticmethod
     def _determine_doc_type(category: str, title: str) -> str:
-        """기능명세서 기준 4가지 타입으로 분류"""
         text_to_check = f"{category} {title}".lower()
         
-        # 참여 유도형 (행사, 설문, 모집 등)
         participation_keywords = ['참여', '모집', '신청', '접수', '공모', '설문', '행사', '이벤트']
-        # 보고형 (사업결과, 예산집행 등)
         report_keywords = ['보고', '현황', '결과', '실적', '예산', '집행', '성과']
-        # 고시/공고형 (입법예고, 조례개정 등)
         announcement_keywords = ['고시', '공고', '입법', '예고', '조례', '개정', '규정', '법령']
-        # 공지형 (행정제도 안내, 통보 등)
         notice_keywords = ['공지', '안내', '통보', '알림', '제도', '변경', '시행']
         
         if any(keyword in text_to_check for keyword in participation_keywords):
@@ -185,9 +174,7 @@ class DocumentDataProcessor:
     
     @staticmethod
     def _get_categories(category_str: str, department: str) -> List[int]:
-        """기능명세서 기준 관심 주제 카테고리 매핑"""
         try:
-            # user.views 기준
             category_mapping = {
                 '문화': ['문화', '예술', '공연', '전시', '축제', '영화', '음악', '행사'],
                 '주택': ['주택', '부동산', '아파트', '주거', '임대', '전세', '매매', '재개발', '재건축'],

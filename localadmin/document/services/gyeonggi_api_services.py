@@ -19,7 +19,6 @@ class GyeonggiAPIService:
         
     def fetch_documents_from_api(self, service_name, start_idx=1, end_idx=100):
         try:
-            # pIndex를 start_idx로, pSize를 end_idx - start_idx + 1로 설정
             page_size = end_idx - start_idx + 1
             
             url = (
@@ -37,10 +36,8 @@ class GyeonggiAPIService:
             
             data = response.json()
             
-            # 응답 구조 확인 및 row 데이터 추출
-            # GgNewsDataPortal 키 아래에 리스트가 있고, 'row'는 두 번째 아이템에 존재
+            # 행 데이터 추출
             if service_name in data and isinstance(data[service_name], list):
-                # 리스트의 두 번째 항목이 'row' 키를 가진 딕셔너리인지 확인
                 if len(data[service_name]) > 1 and 'row' in data[service_name][1]:
                     row_data = data[service_name][1]['row']
                     logger.info(f"Found {len(row_data)} documents in API response")
@@ -70,7 +67,7 @@ class GyeonggiDocumentDataProcessor:
     
     @staticmethod
     def classify_document_type(title, content):
-        # 서울시 코드와 동일하게 재활용
+        # 서울시 코드와 동일하게 재활용 - 리팩토링?
         participation_keywords = ['모집', '신청', '참여', '설문', '공모', '접수', '워크샵', '세미나', '교육', '강의', '행사', '이벤트']
         notice_keywords = ['안내', '통보', '알림', '변경', '시행', '제도', '규정', '정책', '운영', '서비스', '시설', '휴무', '중단']
         report_keywords = ['결과', '현황', '실적', '통계', '보고', '분석', '집행', '예산', '결산', '성과', '평가']
@@ -89,7 +86,6 @@ class GyeonggiDocumentDataProcessor:
 
     @staticmethod
     def extract_categories_from_content(title, content):
-        # 서울시 코드와 동일하게 재활용
         category_mapping = {
             '문화': ['문화', '예술', '공연', '전시', '축제', '영화', '음악', '행사', '도자', '미술관', '교육프로그램', '심포지엄'],
             '주택': ['주택', '부동산', '아파트', '주거', '임대', '전세', '매매', '재개발', '재건축', '상가'],
@@ -122,7 +118,6 @@ class GyeonggiDocumentDataProcessor:
         for fmt in date_formats:
             try:
                 parsed_date = datetime.strptime(date_str, fmt)
-                # timezone-aware datetime으로 변환
                 return timezone.make_aware(parsed_date) if timezone.is_naive(parsed_date) else parsed_date
             except ValueError:
                 continue
@@ -155,7 +150,6 @@ class GyeonggiDocumentDataProcessor:
         for item in api_data_list:
             try:
                 title = item.get('TITLE', '')
-                # API 응답에 본문 내용이 없으므로 제목을 임시로 사용
                 content = item.get('TITLE', '') 
                 pub_date_str = item.get('REGIST_DTM', '')
                 department = item.get('INST_NM', '')
@@ -170,7 +164,6 @@ class GyeonggiDocumentDataProcessor:
                 parsed_date = cls.parse_date(pub_date_str)
                 
                 deadline = None
-                # 본문 내용이 없어 마감일 추출 로직은 비활성화
                 
                 processed_doc = {
                     'doc_title': title,
@@ -204,20 +197,15 @@ class GyeonggiDocumentDataProcessor:
                 department = doc_data.pop('department', '')
                 link_url = doc_data.pop('link_url', '')
                 
-                # 중복 문서 체크 (제목과 링크 URL로 확인하여 정확도 높임)
                 existing_doc = Document.objects.filter(
                     doc_title=doc_data['doc_title'],
                     region_id=doc_data['region_id']
                 ).first()
                 
                 if existing_doc:
-                    # 링크 URL이 달라 새로운 문서일 가능성이 있으므로 추가 확인
-                    # 현재 모델에 link_url 필드가 없으므로, title과 region_id만으로 중복 판단
                     logger.info(f"Document with same title already exists, skipping: {doc_data['doc_title']}")
                     continue
                 
-                # Document 인스턴스 생성
-                # 모델에 없는 department와 link_url 필드는 create 인자에 포함시키지 않음
                 document = Document.objects.create(
                     doc_title=doc_data['doc_title'],
                     doc_content=doc_data['doc_content'],
@@ -229,7 +217,6 @@ class GyeonggiDocumentDataProcessor:
                     is_active=doc_data['is_active']
                 )
                 
-                # 카테고리 처리
                 if category_names:
                     categories = []
                     for category_name in category_names:

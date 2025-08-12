@@ -29,8 +29,8 @@ class DocumentListView(generics.ListAPIView):
         공문 목록을 최신순으로 조회합니다. 사용자의 관심 지역 및 관심 주제로 필터링 가능합니다.
         
         ### 필터링 옵션
-        - region_id: 관심 지역 (6,7)
-        - category: 관심 주제 (5,6 기본-더 선택 가능)
+        - region_id: 관심 지역 (도봉구 - 6, 경기도 - 85)
+        - category: 관심 주제 (1,2,3)
         - doc_type: 공문 타입 (참여/공지/보고/고시공고)
         """,
         manual_parameters=[
