@@ -1,14 +1,10 @@
 import os
 from pathlib import Path
 # from decouple import config
-# ㄴpython-decouple 기본은 .env를 읽음 > .env.local에서 읽도록 변경
-from decouple import Config, RepositoryEnv
+# ㄴpython-decouple 기본은 .env를 읽음 > .env가 없으면 .env.local을 읽도록 변경
+from decouple import Config
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
-
-# python-decouple 기본은 .env를 읽음 > .env.local에서 읽도록 변경
-env_path = BASE_DIR / '.env.local'  # .env.local 경로 지정
-config = Config(RepositoryEnv(env_path))  # 직접 경로로 Config 생성
 
 DOBONG_OPENAPI_KEY = config('DOBONG_OPENAPI_KEY')
 GYEONGGI_OPENAPI_KEY = config('GYEONGGI_OPENAPI_KEY')
