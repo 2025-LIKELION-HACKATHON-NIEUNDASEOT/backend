@@ -6,10 +6,30 @@ from user.models import Category
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Category
-        fields = ['id', 'name']
+        fields = ['id', 'category_name']
+
+
+class DocumentListSerializer(serializers.ModelSerializer):
+    """목록용 시리얼라이저 - 기능명세서 기준"""
+    categories = CategorySerializer(many=True, read_only=True)
+    doc_type_display = serializers.CharField(source='get_doc_type_display', read_only=True)
+    has_deadline = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Document
+        fields = [
+            'id', 'doc_title', 'doc_type', 'doc_type_display',
+            'pub_date', 'dead_date', 'has_deadline',
+            'region_id', 'categories'
+        ]
+    
+    def get_has_deadline(self, obj):
+        """마감일 존재 여부 (참여형 공문용)"""
+        return obj.dead_date is not None
 
 
 class DocumentSerializer(serializers.ModelSerializer):
+    """상세 조회용 시리얼라이저"""
     categories = CategorySerializer(many=True, read_only=True)
     doc_type_display = serializers.CharField(source='get_doc_type_display', read_only=True)
     days_until_deadline = serializers.SerializerMethodField()
@@ -18,38 +38,15 @@ class DocumentSerializer(serializers.ModelSerializer):
         model = Document
         fields = [
             'id', 'doc_title', 'doc_content', 'doc_type', 'doc_type_display',
-            'pub_date', 'dead_date', 'days_until_deadline', 'is_active', 
-            'region_id', 'categories', 'image_url', 'created_at', 'updated_at'
+            'pub_date', 'dead_date', 'days_until_deadline',
+            'region_id', 'categories', 'image_url',
+            'created_at'
         ]
     
     def get_days_until_deadline(self, obj):
+        """마감일까지 남은 일수 (참여형 공문용)"""
         if not obj.dead_date:
             return None
         
-        from django.utils import timezone
         diff = obj.dead_date.date() - timezone.now().date()
         return diff.days if diff.days >= 0 else -1
-
-
-class DocumentListSerializer(serializers.ModelSerializer):
-    """목록용 간소화된 시리얼라이저"""
-    categories = CategorySerializer(many=True, read_only=True)
-    doc_type_display = serializers.CharField(source='get_doc_type_display', read_only=True)
-    is_urgent = serializers.SerializerMethodField()
-    
-    class Meta:
-        model = Document
-        fields = [
-            'id', 'doc_title', 'doc_type', 'doc_type_display',
-            'pub_date', 'dead_date', 'is_urgent', 'region_id', 'categories'
-        ]
-    
-    def get_is_urgent(self, obj):
-        """마감일이 7일 이내인지 확인"""
-        if not obj.dead_date:
-            return False
-        
-        from django.utils import timezone
-        from datetime import timedelta
-        
-        return obj.dead_date <= timezone.now() + timedelta(days=7)

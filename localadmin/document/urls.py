@@ -2,13 +2,14 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
-    # 데이터 저장
-    path('save/', views.save_single_document, name='save_document'),
+    # 공문 데이터 저장
     path('bulk-save/', views.save_documents_from_api, name='bulk_save_documents'),
     
-    # 조회
+    # 공문 조회 (최신순 + 필터링)
     path('', views.DocumentListView.as_view(), name='document_list'),
     path('<int:pk>/', views.DocumentDetailView.as_view(), name='document_detail'),
-    path('region/<int:region_id>/', views.get_documents_by_region, name='documents_by_region'),
-    path('urgent/', views.get_urgent_documents, name='urgent_documents'),
+    
+    # 기능명세서 기준 특별 조회
+    path('region/<int:region_id>/recent/', views.get_recent_region_news, name='recent_region_news'),
+    path('categories/recent-alerts/', views.get_recent_category_alerts, name='recent_category_alerts'),
 ]
