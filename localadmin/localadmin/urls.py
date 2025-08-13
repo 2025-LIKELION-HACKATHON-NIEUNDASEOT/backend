@@ -60,6 +60,7 @@ urlpatterns = [
     path('api/scrap/', include('scrap.urls')),
     path('api/region/', include('region.urls')), 
     path('api/documents/', include('document.urls')),
+    path('api/notification/', include('notification.urls')),
     
     # DRF-yasg
     re_path(r'^swagger(?P<format>\.json|\.yaml)$', schema_view.without_ui(cache_timeout=0), name='schema-json'),

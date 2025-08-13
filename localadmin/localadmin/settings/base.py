@@ -19,6 +19,7 @@ INSTALLED_APPS = [
     'scrap',
     'document',
     'region',
+    'notification.apps.NotificationConfig',
 ]
 
 MIDDLEWARE = [
