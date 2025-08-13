@@ -1,3 +1,423 @@
-from django.shortcuts import render
+# views.py (기존 코드에 추가)
+from rest_framework import generics, status
+from rest_framework.response import Response
+from rest_framework.decorators import api_view
+from django.db.models import Q
+from django.utils import timezone
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
+import logging
 
-# Create your views here.
+from .models import Document, DocumentTypeChoices
+from .services import DocumentService, DocumentDataProcessor
+from .services.seoul_api_service import SeoulAPIService, DocumentService as SeoulDocumentService
+from .serializers import DocumentSerializer, DocumentListSerializer
+
+logger = logging.getLogger(__name__)
+
+
+class DocumentListView(generics.ListAPIView):
+    """
+    공문 목록 조회 (최신순 정렬 + 관심 지역/주제 필터링)
+    기능명세서: "관심 분야의 최근 알림", "관심 지역 최근 소식"
+    """
+    serializer_class = DocumentListSerializer
+    
+    @swagger_auto_schema(
+        operation_summary="공문 목록 조회 (최신순)",
+        operation_description="""
+        공문 목록을 최신순으로 조회합니다. 사용자의 관심 지역 및 관심 주제로 필터링 가능합니다.
+        
+        ### 필터링 옵션
+        - region_id: 관심 지역 (도봉구 - 6, 경기도 - 85)
+        - category: 관심 주제 (1,2,3)
+        - doc_type: 공문 타입 (참여/공지/보고/고시공고)
+        """,
+        manual_parameters=[
+            openapi.Parameter(
+                'region_id', openapi.IN_QUERY, 
+                description="관심 지역 ID (복수 선택: 1,2,3)", 
+                type=openapi.TYPE_STRING
+            ),
+            openapi.Parameter(
+                'category', openapi.IN_QUERY,
+                description="관심 주제 ID (복수 선택: 1,2,3)",
+                type=openapi.TYPE_STRING
+            ),
+            openapi.Parameter(
+                'doc_type', openapi.IN_QUERY,
+                description="공문 타입",
+                type=openapi.TYPE_STRING,
+                enum=['PARTICIPATION', 'NOTICE', 'REPORT', 'ANNOUNCEMENT']
+            ),
+        ],
+        responses={200: DocumentListSerializer(many=True)},
+        tags=['공문 조회']
+    )
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+    
+    def get_queryset(self):
+        queryset = Document.objects.filter(is_active=True).select_related().prefetch_related('categories')
+        
+        # region_id 쿼리 파라미터 예: "1,2,3"
+        region_ids_str = self.request.query_params.get('region_id', '')  # 문자열로 받음
+        if region_ids_str:
+            # 쉼표로 분리 후 정수 리스트로 변환
+            try:
+                region_ids = [int(rid.strip()) for rid in region_ids_str.split(',') if rid.strip().isdigit()]
+                if region_ids:
+                    queryset = queryset.filter(region_id__in=region_ids)
+            except ValueError:
+                pass  # 숫자 변환 실패 시 무시하거나 예외 처리
+        
+        # category도 같은 패턴으로
+        category_str = self.request.query_params.get('category', '')
+        if category_str:
+            try:
+                category_ids = [int(cid.strip()) for cid in category_str.split(',') if cid.strip().isdigit()]
+                if category_ids:
+                    queryset = queryset.filter(categories__id__in=category_ids).distinct()
+            except ValueError:
+                pass
+        
+        # doc_type은 문자열이라 getlist() 써도 됨 (여러 개로 받을 수 있다면)
+        doc_types = self.request.query_params.getlist('doc_type')
+        if doc_types:
+            queryset = queryset.filter(doc_type__in=doc_types)
+        
+        return queryset.order_by('-pub_date')
+
+
+class DocumentDetailView(generics.RetrieveAPIView):
+    """
+    공문 상세 조회
+    기능명세서: "공문 자세히보기"
+    """
+    queryset = Document.objects.filter(is_active=True)
+    serializer_class = DocumentSerializer
+    
+    @swagger_auto_schema(
+        operation_summary="공문 상세 조회",
+        operation_description="특정 공문의 상세 정보를 조회합니다.",
+        responses={
+            200: DocumentSerializer(),
+            404: "공문을 찾을 수 없습니다."
+        },
+        tags=['공문 조회']
+    )
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+
+
+@swagger_auto_schema(
+    method='post',
+    operation_summary="서울시 OpenAPI 데이터 동기화",
+    operation_description="서울시 OpenAPI에서 공문 데이터를 조회하여 DB에 저장합니다.",
+    request_body=openapi.Schema(
+        type=openapi.TYPE_OBJECT,
+        required=['region_id', 'service_name'],
+        properties={
+            'region_id': openapi.Schema(
+                type=openapi.TYPE_INTEGER, 
+                description='지역 ID'
+            ),
+            'service_name': openapi.Schema(
+                type=openapi.TYPE_STRING, 
+                description='서울시 API 서비스명 (예: ListPublicDataPblancDetail)'
+            ),
+            'api_key': openapi.Schema(
+                type=openapi.TYPE_STRING, 
+                description='서울시 API 키 (선택사항, settings에서 가져옴)',
+            ),
+            'start_idx': openapi.Schema(
+                type=openapi.TYPE_INTEGER, 
+                description='시작 인덱스 (기본값: 1)',
+                default=1
+            ),
+            'end_idx': openapi.Schema(
+                type=openapi.TYPE_INTEGER, 
+                description='종료 인덱스 (기본값: 100)',
+                default=100
+            ),
+        }
+    ),
+    responses={
+        201: "동기화 성공", 
+        400: "잘못된 요청",
+        500: "서버 오류"
+    },
+    tags=['서울시 API 연동']
+)
+@api_view(['POST'])
+def sync_seoul_api_data(request):
+    """서울시 OpenAPI 데이터 동기화"""
+    try:
+        region_id = request.data.get('region_id')
+        service_name = request.data.get('service_name')
+        api_key = request.data.get('api_key')
+        start_idx = request.data.get('start_idx', 1)
+        end_idx = request.data.get('end_idx', 100)
+        
+        if not region_id or not service_name:
+            return Response(
+                {'error': '지역 ID와 서비스명이 필요합니다.'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # 서울시 API 서비스 초기화
+        api_service = SeoulAPIService(api_key)
+        
+        # API 데이터 조회
+        api_data = api_service.fetch_documents_from_api(
+            service_name=service_name,
+            start_idx=start_idx,
+            end_idx=end_idx
+        )
+        
+        if not api_data:
+            return Response(
+                {'message': 'API에서 데이터를 가져오지 못했습니다.',
+                 'created_count': 0}, 
+                status=status.HTTP_200_OK
+            )
+        
+        # 데이터 처리 및 저장
+        processed_documents = DocumentDataProcessor.process_seoul_api_data(
+            api_data, region_id
+        )
+        
+        created_documents = SeoulDocumentService.bulk_create_documents_from_seoul_api(
+            processed_documents
+        )
+        
+        return Response({
+            'message': f'서울시 API에서 {len(created_documents)}개의 공문을 성공적으로 동기화했습니다.',
+            'created_count': len(created_documents),
+            'total_fetched': len(api_data),
+            'documents': DocumentListSerializer(created_documents, many=True).data[:10]  # 처음 10개만 반환
+        }, status=status.HTTP_201_CREATED)
+        
+    except Exception as e:
+        logger.error(f"Seoul API sync error: {e}")
+        return Response(
+            {'error': f'동기화 중 오류가 발생했습니다: {str(e)}'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@swagger_auto_schema(
+    method='post',
+    operation_summary="API 데이터 일괄 저장 (기존 방식)",
+    operation_description="외부 API에서 가져온 공문 데이터를 일괄로 저장합니다.",
+    request_body=openapi.Schema(
+        type=openapi.TYPE_OBJECT,
+        required=['region_id', 'documents'],
+        properties={
+            'region_id': openapi.Schema(type=openapi.TYPE_INTEGER, description='지역 ID'),
+            'documents': openapi.Schema(
+                type=openapi.TYPE_ARRAY,
+                description='공문 데이터 배열',
+                items=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        'title': openapi.Schema(type=openapi.TYPE_STRING, description='제목'),
+                        'content': openapi.Schema(type=openapi.TYPE_STRING, description='내용'),
+                        'date': openapi.Schema(type=openapi.TYPE_STRING, format='date-time', description='게시일'),
+                        'deadline': openapi.Schema(type=openapi.TYPE_STRING, format='date-time', description='마감일 (참여형만)'),
+                        'category': openapi.Schema(type=openapi.TYPE_STRING, description='카테고리'),
+                        'department': openapi.Schema(type=openapi.TYPE_STRING, description='부서명'),
+                    }
+                )
+            )
+        }
+    ),
+    responses={201: "저장 성공", 400: "잘못된 요청"},
+    tags=['공문 저장']
+)
+@api_view(['POST'])
+def save_documents_from_api(request):
+    """외부 API에서 가져온 공문 데이터 일괄 저장 (기존 방식)"""
+    try:
+        region_id = request.data.get('region_id')
+        raw_documents = request.data.get('documents', [])
+        
+        if not region_id:
+            return Response(
+                {'error': '지역 ID가 필요합니다.'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # 데이터 처리 (4가지 타입으로 자동 분류)
+        processed_documents = []
+        for raw_doc in raw_documents:
+            processed_doc = DocumentDataProcessor.process_api_data(raw_doc, region_id)
+            processed_documents.append(processed_doc)
+        
+        # 일괄 저장
+        created_documents = DocumentService.bulk_create_documents(processed_documents)
+        
+        return Response({
+            'message': f'{len(created_documents)}개의 공문이 저장되었습니다.',
+            'created_count': len(created_documents),
+            'documents': DocumentListSerializer(created_documents, many=True).data
+        }, status=status.HTTP_201_CREATED)
+        
+    except Exception as e:
+        logger.error(f"Error saving documents: {e}")
+        return Response(
+            {'error': str(e)}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@swagger_auto_schema(
+    method='get',
+    operation_summary="서울시 API 서비스 상태 확인",
+    operation_description="서울시 OpenAPI 서비스 연결 상태를 확인합니다.",
+    manual_parameters=[
+        openapi.Parameter(
+            'service_name', openapi.IN_QUERY,
+            description="확인할 서비스명",
+            type=openapi.TYPE_STRING,
+            required=True
+        )
+    ],
+    responses={200: "서비스 정상", 400: "서비스 오류"},
+    tags=['서울시 API 연동']
+)
+@api_view(['GET'])
+def check_seoul_api_status(request):
+    """서울시 API 서비스 상태 확인"""
+    try:
+        service_name = request.query_params.get('service_name')
+        
+        if not service_name:
+            return Response(
+                {'error': '서비스명이 필요합니다.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # API 서비스 초기화
+        api_service = SeoulAPIService()
+        
+        # 테스트용으로 1개 데이터만 조회
+        test_data = api_service.fetch_documents_from_api(
+            service_name=service_name,
+            start_idx=1,
+            end_idx=1
+        )
+        
+        if test_data:
+            return Response({
+                'status': 'success',
+                'message': f'{service_name} 서비스가 정상 작동합니다.',
+                'service_name': service_name,
+                'sample_data_count': len(test_data)
+            }, status=status.HTTP_200_OK)
+        else:
+            return Response({
+                'status': 'warning',
+                'message': f'{service_name} 서비스에서 데이터를 가져올 수 없습니다.',
+                'service_name': service_name
+            }, status=status.HTTP_200_OK)
+            
+    except Exception as e:
+        logger.error(f"Seoul API status check error: {e}")
+        return Response({
+            'status': 'error',
+            'message': f'서비스 상태 확인 중 오류가 발생했습니다: {str(e)}',
+            'service_name': service_name
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@swagger_auto_schema(
+    method='get',
+    operation_summary="관심 지역 최근 소식 (최신순 3개)",
+    operation_description="""
+    기능명세서: "설정된 지역의 새로운 소식을 관심 분야와 관계 없이 최신순으로 3개 노출"
+    """,
+    manual_parameters=[
+        openapi.Parameter(
+            'region_id', openapi.IN_PATH,
+            description="관심 지역 ID",
+            type=openapi.TYPE_INTEGER,
+            required=True
+        )
+    ],
+    responses={200: DocumentListSerializer(many=True)},
+    tags=['공문 조회']
+)
+@api_view(['GET'])
+def get_recent_region_news(request, region_id):
+    """관심 지역 최근 소식 3개 (기능명세서 요구사항)"""
+    try:
+        # 해당 지역의 최신 공문 3개
+        documents = Document.objects.filter(
+            region_id=region_id,
+            is_active=True
+        ).order_by('-pub_date')[:3]
+        
+        serializer = DocumentListSerializer(documents, many=True)
+        
+        return Response({
+            'region_id': region_id,
+            'recent_news': serializer.data,
+            'count': documents.count()
+        })
+        
+    except Exception as e:
+        return Response(
+            {'error': str(e)}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@swagger_auto_schema(
+    method='get',
+    operation_summary="관심 분야 최근 알림 (최신순 3개)",
+    operation_description="""
+    기능명세서: "사용자가 관심 분야로 설정한 카테고리의 공문 최신순으로 3개 노출"
+    """,
+    manual_parameters=[
+        openapi.Parameter(
+            'category_ids', openapi.IN_QUERY,
+            description="관심 카테고리 ID들 (쉼표로 구분: 1,2,3)",
+            type=openapi.TYPE_STRING,
+            required=True
+        )
+    ],
+    responses={200: DocumentListSerializer(many=True)},
+    tags=['공문 조회']
+)
+@api_view(['GET'])
+def get_recent_category_alerts(request):
+    """관심 분야 최근 알림 3개 (기능명세서 요구사항)"""
+    try:
+        category_ids = request.query_params.get('category_ids', '').split(',')
+        
+        if not category_ids or category_ids == ['']:
+            return Response(
+                {'error': '관심 카테고리 ID가 필요합니다.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # 관심 카테고리의 최신 공문 3개
+        documents = Document.objects.filter(
+            categories__id__in=category_ids,
+            is_active=True
+        ).distinct().order_by('-pub_date')[:3]
+        
+        serializer = DocumentListSerializer(documents, many=True)
+        
+        return Response({
+            'category_ids': category_ids,
+            'recent_alerts': serializer.data,
+            'count': documents.count()
+        })
+        
+    except Exception as e:
+        return Response(
+            {'error': str(e)}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

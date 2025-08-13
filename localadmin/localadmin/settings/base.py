@@ -1,7 +1,14 @@
 import os
 from pathlib import Path
+# from decouple import config
+# ㄴpython-decouple 기본은 .env를 읽음 > .env가 없으면 .env.local을 읽도록 변경
+from decouple import Config
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
+
+DOBONG_OPENAPI_KEY = config('DOBONG_OPENAPI_KEY')
+GYEONGGI_OPENAPI_KEY = config('GYEONGGI_OPENAPI_KEY')
+# 밑에 다른 API 키 추가... 서비스 확장 시
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -76,6 +83,7 @@ SWAGGER_SETTINGS = {
     'USE_SESSION_AUTH'        : False,
     'JSON_EDITOR'             : True,
     'SUPPORTED_SUBMIT_METHODS': ['get', 'post', 'put', 'delete', 'patch'],
+    
 }
 
 STATIC_URL  = '/static/'

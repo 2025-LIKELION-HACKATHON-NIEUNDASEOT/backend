@@ -27,7 +27,7 @@ class Document(BaseTimeStampModel):
         verbose_name = '내용'
     )
     doc_type   = models.CharField(
-        max_length   = 20,
+        max_length   = 64,
         choices      = DocumentTypeChoices.choices,
         null         = True,
         blank        = True,
