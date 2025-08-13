@@ -30,7 +30,9 @@ jobs:
           AWS_SECRET_ACCESS_KEY,
           AWS_STORAGE_BUCKET_NAME,
           ALLOWED_HOSTS,
-          CORS_ALLOWED_ORIGINS
+          CORS_ALLOWED_ORIGINS,
+          DOBONG_OPENAPI_KEY,
+          GYEONGGI_OPENAPI_KEY
         script: |
           set -e
           
@@ -51,6 +53,8 @@ jobs:
           AWS_STORAGE_BUCKET_NAME=${{ secrets.AWS_STORAGE_BUCKET_NAME }}
           AWS_S3_REGION_NAME=ap-northeast-2
           CORS_ALLOWED_ORIGINS=${{ secrets.CORS_ALLOWED_ORIGINS }}
+          DOBONG_OPENAPI_KEY=${{ secrets.DOBONG_OPENAPI_KEY }}
+          GYEONGGI_OPENAPI_KEY=${{ secrets.GYEONGGI_OPENAPI_KEY }}
           EOF
           
           # Git 업데이트
@@ -72,6 +76,8 @@ jobs:
           python manage.py migrate
           python manage.py create_initial_data --force
           python manage.py load_regions
+          python manage.py fetch_dobong_docs
+          python manage.py fetch_gyeonggi_docs
           python manage.py collectstatic --noinput
           
           # 서비스 재시작

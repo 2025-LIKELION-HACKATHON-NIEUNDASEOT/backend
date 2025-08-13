@@ -20,6 +20,8 @@ SGIS_CONSUMER_SECRET = env('SGIS_CONSUMER_SECRET', default=None)
 GEMINI_API_KEY       = env('GEMINI_API_KEY', default=None)
 if GEMINI_API_KEY:
     os.environ['GEMINI_API_KEY'] = GEMINI_API_KEY
+DOBONG_OPENAPI_KEY   = env('DOBONG_OPENAPI_KEY', default=None)
+GYEONGGI_OPENAPI_KEY = env('GYEONGGI_OPENAPI_KEY', default=None)
 
 
 ALLOWED_HOSTS          = ['*']
