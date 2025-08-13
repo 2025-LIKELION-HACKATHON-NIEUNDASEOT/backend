@@ -59,7 +59,7 @@ class DocumentScrapAdmin(admin.ModelAdmin):
         'user__name', 'user__user_id', 
         'document__doc_title'
     ]
-    date_hierarchy = 'created_at'
+    #date_hierarchy = 'created_at'
     ordering       = ['-created_at']
     
     readonly_fields = ['created_at']

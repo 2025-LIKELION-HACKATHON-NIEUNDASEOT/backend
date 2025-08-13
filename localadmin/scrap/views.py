@@ -366,6 +366,23 @@ def scrap_detail(request, scrap_id):
     - **page** (int, 선택) : 페이지 번호, 기본값 1
     - **page_size** (int, 선택) : 페이지 크기, 기본값 10
     
+    **응답 데이터:**
+    - **id** (int) : 공문 ID
+    - **doc_title** (string) : 공문 제목
+    - **doc_type** (string) : 공문 타입
+    - **doc_type_display** (string) : 공문 타입 한글명
+    - **pub_date** (string) : 게시 날짜 (ISO 8601)
+    - **region** (object) : 공문 관련 지역 정보
+      - **id** (int) : 지역 ID
+      - **city** (string) : 시/도
+      - **district** (string) : 구/군
+      - **full_name** (string) : 전체 지역 이름
+    - **categories** (array) : 카테고리 목록
+      - **id** (int) : 카테고리 ID
+      - **category_name** (string) : 카테고리 이름
+    - **image_url** (string) : 공문 이미지 URL
+    - **created_at** (string) : 스크랩 생성 시각 (ISO 8601)
+    
     **주의:**
     - doc_type, region_ids, category_ids는 비워두면 전체를 검색합니다
     """,
@@ -456,6 +473,26 @@ def scrap_detail(request, scrap_id):
     
     **요청 바디:**
     - **document_id** (int, 필수) : 스크랩할 공문 ID
+    
+    **응답 데이터 (data):**
+    - **id** (int) : 스크랩 ID
+    - **user** (int) : 스크랩한 사용자 ID
+    - **user_name** (string) : 스크랩한 사용자 이름
+    - **document** (int) : 스크랩된 공문 ID
+    - **doc_title** (string) : 공문 제목
+    - **doc_type** (string) : 공문 타입 (PARTICIPATION, NOTICE, REPORT, ANNOUNCEMENT)
+    - **doc_type_display** (string) : 공문 타입 한글명
+    - **pub_date** (string) : 게시 날짜 (ISO 8601)
+    - **region** (object) : 공문 관련 지역 정보
+      - **id** (int) : 지역 ID
+      - **city** (string) : 시/도
+      - **district** (string) : 구/군
+      - **full_name** (string) : 전체 지역 이름
+    - **categories** (array) : 카테고리 목록
+      - **id** (int) : 카테고리 ID
+      - **category_name** (string) : 카테고리 이름
+    - **image_url** (string) : 공문 이미지 URL (도메인 이름은 villit.o-r.kr입니다. https://villit.o-r.kr/)
+    - **created_at** (string) : 스크랩 생성 시각 (ISO 8601)
     """,
     request_body=DocumentScrapCreateSerializer,
     responses={
