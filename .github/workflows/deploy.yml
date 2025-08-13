@@ -14,10 +14,6 @@ jobs:
     - name: Checkout Repository
       uses: actions/checkout@v4
 
-    - name: Setup Firebase credentials
-      run: |
-        echo "${{ secrets.FIREBASE_CREDENTIALS }}" > firebase-credentials.json
-
     - name: Deploy to EC2
       uses: appleboy/ssh-action@v1.0.3
       with:
@@ -37,17 +33,18 @@ jobs:
           CORS_ALLOWED_ORIGINS,
           DOBONG_OPENAPI_KEY,
           GYEONGGI_OPENAPI_KEY,
-          FIREBASE_CREDENTIALS_PATH
+          FIREBASE_CREDENTIALS
         script: |
           set -e
           
           echo "🚀 Starting deployment..."
           
+          # Firebase credentials 파일 생성
+          cd /home/ubuntu/Villit_BE/localadmin
+          echo "${{ secrets.FIREBASE_CREDENTIALS }}" > localadmin/firebase-credentials.json
+
           # 프로젝트 디렉토리로 이동
           cd /home/ubuntu/Villit_BE
-
-          # Secrets에 저장된 Firebase 키를 파일로 생성
-          echo "${{ secrets.FIREBASE_CREDENTIALS }}" > firebase-credentials.json
           
           # .env 파일 자동 생성 (GitHub Secrets에서)
           cat > .env << EOF
@@ -63,7 +60,7 @@ jobs:
           CORS_ALLOWED_ORIGINS=${{ secrets.CORS_ALLOWED_ORIGINS }}
           DOBONG_OPENAPI_KEY=${{ secrets.DOBONG_OPENAPI_KEY }}
           GYEONGGI_OPENAPI_KEY=${{ secrets.GYEONGGI_OPENAPI_KEY }}
-          FIREBASE_CREDENTIALS_PATH=/home/ubuntu/Villit_BE/localdamin/firebase-credentials.json
+          FIREBASE_CREDENTIALS_PATH=/home/ubuntu/Villit_BE/localadmin/firebase-credentials.json
           EOF
           
           # Git 업데이트
