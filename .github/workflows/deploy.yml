@@ -40,14 +40,15 @@ jobs:
           echo "🚀 Starting deployment..."
           
           # Firebase credentials 파일 생성
-          cd /home/ubuntu/Villit_BE/localadmin
+          cd /home/ubuntu/Villit_BE
+          mkdir -p localadmin
           echo "${{ secrets.FIREBASE_CREDENTIALS }}" > localadmin/firebase-credentials.json
 
           # 프로젝트 디렉토리로 이동
           cd /home/ubuntu/Villit_BE
           
           # .env 파일 자동 생성 (GitHub Secrets에서)
-          cat > .env << EOF
+          cat > localadmin/.env << EOF
           SECRET_KEY=${{ secrets.SECRET_KEY }}
           GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
           SGIS_CONSUMER_KEY=${{ secrets.SGIS_CONSUMER_KEY }}
