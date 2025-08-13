@@ -28,12 +28,13 @@ from user.utils                      import (
     operation_summary="새 챗봇 세션 생성",
     operation_description="""
     새로운 챗봇 세션을 생성합니다.
+    한 공문 당 하나의 세션(챗봇방)이 생길 수 있습니다.
 
     **요청 바디:**
     - **document_id** (int, 필수) : 연결할 공문 ID
     - **initial_message** (string, 필수) : 세션 시작 시의 첫 질문 메시지
 
-    **응답 데이터 (상세조회와 동일 구조):**
+    **응답 데이터:**
     - **id** (int) : 세션 ID
     - **is_active** (boolean) : 세션 활성 상태
     - **created_at** (string) : 세션 생성 시각 (YYYY-MM-DD HH:MM:SS)
@@ -186,7 +187,7 @@ def session_create(request):
     operation_description="""
     특정 챗봇 세션의 상세 정보와 모든 메시지 내역을 조회합니다.
 
-    **응답 예시:**
+    **응답 데이터:**
     - **id**
     - **title**
     - **is_active**

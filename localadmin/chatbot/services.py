@@ -105,7 +105,7 @@ class GeminiChatService:
 
         return "\n".join(prompt_parts)
 
-    def summarize_response(self, response: str, max_length: int = 100) -> str:
+    def summarize_response(self, response: str, max_length: int = 65) -> str:
         # AI 응답을 한 줄로 요약
         try:
             prompt = (
