@@ -1,4 +1,3 @@
-# views.py (기존 코드에 추가)
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
@@ -11,16 +10,12 @@ import logging
 from .models import Document, DocumentTypeChoices
 from .services import DocumentService, DocumentDataProcessor
 from .services.seoul_api_service import SeoulAPIService, DocumentService as SeoulDocumentService
-from .serializers import DocumentSerializer, DocumentListSerializer
+from .serializers import DocumentSerializer, DocumentListSerializer, DocumentDetailWithSimilarSerializer
+from .utils import analyze_document_content, search_similar_documents_in_db, list_to_comma_separated_str, comma_separated_str_to_list
 
 logger = logging.getLogger(__name__)
 
-
 class DocumentListView(generics.ListAPIView):
-    """
-    공문 목록 조회 (최신순 정렬 + 관심 지역/주제 필터링)
-    기능명세서: "관심 분야의 최근 알림", "관심 지역 최근 소식"
-    """
     serializer_class = DocumentListSerializer
     
     @swagger_auto_schema(
@@ -36,7 +31,7 @@ class DocumentListView(generics.ListAPIView):
         manual_parameters=[
             openapi.Parameter(
                 'region_id', openapi.IN_QUERY, 
-                description="관심 지역 ID (복수 선택: 1,2,3)", 
+                description="관심 지역 ID (복수 선택: 6,83)", 
                 type=openapi.TYPE_STRING
             ),
             openapi.Parameter(
@@ -60,18 +55,15 @@ class DocumentListView(generics.ListAPIView):
     def get_queryset(self):
         queryset = Document.objects.filter(is_active=True).select_related().prefetch_related('categories')
         
-        # region_id 쿼리 파라미터 예: "1,2,3"
-        region_ids_str = self.request.query_params.get('region_id', '')  # 문자열로 받음
+        region_ids_str = self.request.query_params.get('region_id', '')
         if region_ids_str:
-            # 쉼표로 분리 후 정수 리스트로 변환
             try:
                 region_ids = [int(rid.strip()) for rid in region_ids_str.split(',') if rid.strip().isdigit()]
                 if region_ids:
                     queryset = queryset.filter(region_id__in=region_ids)
             except ValueError:
-                pass  # 숫자 변환 실패 시 무시하거나 예외 처리
+                pass
         
-        # category도 같은 패턴으로
         category_str = self.request.query_params.get('category', '')
         if category_str:
             try:
@@ -81,7 +73,6 @@ class DocumentListView(generics.ListAPIView):
             except ValueError:
                 pass
         
-        # doc_type은 문자열이라 getlist() 써도 됨 (여러 개로 받을 수 있다면)
         doc_types = self.request.query_params.getlist('doc_type')
         if doc_types:
             queryset = queryset.filter(doc_type__in=doc_types)
@@ -89,25 +80,25 @@ class DocumentListView(generics.ListAPIView):
         return queryset.order_by('-pub_date')
 
 
-class DocumentDetailView(generics.RetrieveAPIView):
-    """
-    공문 상세 조회
-    기능명세서: "공문 자세히보기"
-    """
-    queryset = Document.objects.filter(is_active=True)
-    serializer_class = DocumentSerializer
+# class DocumentDetailView(generics.RetrieveAPIView):
+#     """
+#     공문 상세 조회
+#     기능명세서: "공문 자세히보기"
+#     """
+#     queryset = Document.objects.filter(is_active=True)
+#     serializer_class = DocumentSerializer
     
-    @swagger_auto_schema(
-        operation_summary="공문 상세 조회",
-        operation_description="특정 공문의 상세 정보를 조회합니다.",
-        responses={
-            200: DocumentSerializer(),
-            404: "공문을 찾을 수 없습니다."
-        },
-        tags=['공문 조회']
-    )
-    def get(self, request, *args, **kwargs):
-        return super().get(request, *args, **kwargs)
+#     @swagger_auto_schema(
+#         operation_summary="공문 상세 조회",
+#         operation_description="특정 공문의 상세 정보를 조회합니다.",
+#         responses={
+#             200: DocumentSerializer(),
+#             404: "공문을 찾을 수 없습니다."
+#         },
+#         tags=['공문 조회']
+#     )
+#     def get(self, request, *args, **kwargs):
+#         return super().get(request, *args, **kwargs)
 
 
 @swagger_auto_schema(
@@ -165,10 +156,9 @@ def sync_seoul_api_data(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # 서울시 API 서비스 초기화
+        # API
         api_service = SeoulAPIService(api_key)
         
-        # API 데이터 조회
         api_data = api_service.fetch_documents_from_api(
             service_name=service_name,
             start_idx=start_idx,
@@ -182,7 +172,6 @@ def sync_seoul_api_data(request):
                 status=status.HTTP_200_OK
             )
         
-        # 데이터 처리 및 저장
         processed_documents = DocumentDataProcessor.process_seoul_api_data(
             api_data, region_id
         )
@@ -248,7 +237,7 @@ def save_documents_from_api(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # 데이터 처리 (4가지 타입으로 자동 분류)
+        # 데이터 처리 -4가지 타입
         processed_documents = []
         for raw_doc in raw_documents:
             processed_doc = DocumentDataProcessor.process_api_data(raw_doc, region_id)
@@ -298,10 +287,8 @@ def check_seoul_api_status(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # API 서비스 초기화
         api_service = SeoulAPIService()
         
-        # 테스트용으로 1개 데이터만 조회
         test_data = api_service.fetch_documents_from_api(
             service_name=service_name,
             start_idx=1,
@@ -350,7 +337,6 @@ def check_seoul_api_status(request):
 )
 @api_view(['GET'])
 def get_recent_region_news(request, region_id):
-    """관심 지역 최근 소식 3개 (기능명세서 요구사항)"""
     try:
         # 해당 지역의 최신 공문 3개
         documents = Document.objects.filter(
@@ -392,7 +378,6 @@ def get_recent_region_news(request, region_id):
 )
 @api_view(['GET'])
 def get_recent_category_alerts(request):
-    """관심 분야 최근 알림 3개 (기능명세서 요구사항)"""
     try:
         category_ids = request.query_params.get('category_ids', '').split(',')
         
@@ -421,3 +406,66 @@ def get_recent_category_alerts(request):
             {'error': str(e)}, 
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+class DocumentDetailView(generics.RetrieveAPIView):
+    queryset = Document.objects.filter(is_active=True)
+    serializer_class = DocumentDetailWithSimilarSerializer
+
+    @swagger_auto_schema(
+        operation_summary="공문 상세 조회 및 유사 공문 추천",
+        operation_description="특정 공문의 상세 정보를 조회하고, 유사한 공문 목록을 함께 추천합니다.",
+        responses={
+            200: DocumentDetailWithSimilarSerializer(),
+            404: "공문을 찾을 수 없습니다."
+        },
+        tags=['공문 조회']
+    )
+    def get(self, request, *args, **kwargs):
+        instance = self.get_object()
+        
+        # 1. 캐싱된 분석 데이터 확인 및 사용
+        analyzed_data = {}
+        # keywords 필드가 비어있지 않다면, 이미 분석된 것으로 간주
+        if instance.keywords and instance.related_departments and instance.purpose:
+            print(f"--- Document ID {instance.id}: 캐싱된 분석 데이터 사용 ---")
+            analyzed_data = {
+                "title": instance.doc_title, # 제목은 항상 사용
+                "keywords": comma_separated_str_to_list(instance.keywords),
+                "related_departments": comma_separated_str_to_list(instance.related_departments),
+                "purpose": instance.purpose
+                # issue_date, summary는 검색에 직접 사용되지 않으므로 포함하지 않아도 됨
+            }
+        else:
+            # 2. 캐싱된 데이터가 없으면 Gemini API 호출하여 분석
+            print(f"--- Document ID {instance.id}: Gemini API 호출하여 분석 ---")
+            document_content = instance.doc_content
+            gemini_result = analyze_document_content(document_content)
+
+            if gemini_result:
+                analyzed_data = gemini_result
+                
+                # 3. 분석 결과 DB에 저장 (캐싱)
+                instance.keywords = list_to_comma_separated_str(gemini_result.get('keywords'))
+                instance.related_departments = list_to_comma_separated_str(gemini_result.get('related_departments'))
+                instance.purpose = gemini_result.get('purpose')
+                
+                try:
+                    instance.save(update_fields=['keywords', 'related_departments', 'purpose'])
+                    print(f"--- Document ID {instance.id}: 분석 결과 DB에 저장 완료 ---")
+                except Exception as e:
+                    print(f"--- Document ID {instance.id}: 분석 결과 DB 저장 중 오류 발생: {e} ---")
+            else:
+                print(f"--- Document ID {instance.id}: Gemini 분석 실패. 유사 공문 추천 불가. ---")
+                # Gemini 분석 실패 시, analyzed_data는 비어있는 상태로 유지되어 유사 공문 검색을 건너뜀
+
+        similar_docs_data = []
+        if analyzed_data: # 분석된 데이터가 있을 경우에만 유사 공문 검색
+            print(f"--- Document ID {instance.id}: 유사 공문 검색 시작 ---")
+            similar_docs_data = search_similar_documents_in_db(analyzed_data, current_doc_id=instance.id, limit=3)
+            print(f"--- Document ID {instance.id}: 최종 유사 공문 검색 결과: {len(similar_docs_data)}개 ---")
+        
+        serializer = self.get_serializer(instance)
+        response_data = serializer.data
+        response_data['similar_documents'] = similar_docs_data
+
+        return Response(response_data, status=status.HTTP_200_OK)

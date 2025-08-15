@@ -64,6 +64,19 @@ class Document(BaseTimeStampModel):
         verbose_name = '이미지 URL',
         help_text   = '이미지 파일 URL 또는 경로'
     )
+    # 추천 관련 Gemini 캐시용 필드 추가
+    keywords = models.TextField(
+        null=True, 
+        blank=True
+    )
+    related_departments = models.TextField(
+        null=True, 
+        blank=True
+    )
+    purpose = models.TextField(
+        null=True, 
+        blank=True
+    )
 
     class Meta:
         db_table             = 'document'

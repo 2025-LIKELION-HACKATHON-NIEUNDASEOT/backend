@@ -20,11 +20,11 @@ class DocumentListSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'doc_title', 'doc_type', 'doc_type_display',
             'pub_date', 'dead_date', 'has_deadline',
-            'region_id', 'categories'
+            'region_id', 'categories', 'image_url', 'created_at'
         ]
     
     def get_has_deadline(self, obj):
-        """마감일 존재 여부 (참여형 공문용)"""
+        # 마감일 존재 여부 (참여형 공문용)
         return obj.dead_date is not None
 
 
@@ -36,12 +36,11 @@ class DocumentSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Document
-        fields = [
+        fields = (
             'id', 'doc_title', 'doc_content', 'doc_type', 'doc_type_display',
             'pub_date', 'dead_date', 'days_until_deadline',
-            'region_id', 'categories', 'image_url',
-            'created_at'
-        ]
+            'region_id', 'categories', 'image_url', 'created_at'
+        )
     
     def get_days_until_deadline(self, obj):
         # 마감일
@@ -50,3 +49,16 @@ class DocumentSerializer(serializers.ModelSerializer):
         
         diff = obj.dead_date.date() - timezone.now().date()
         return diff.days if diff.days >= 0 else -1
+
+# 유사 공문 추천
+class SimilarDocumentSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    doc_title = serializers.CharField(max_length=255)
+    preview_content = serializers.CharField()
+    pub_date = serializers.DateTimeField()
+
+class DocumentDetailWithSimilarSerializer(DocumentSerializer):
+    similar_documents = SimilarDocumentSerializer(many=True, read_only=True)
+
+    class Meta(DocumentSerializer.Meta):
+        fields = DocumentSerializer.Meta.fields + ('similar_documents',)
