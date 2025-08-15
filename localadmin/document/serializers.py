@@ -1,7 +1,8 @@
 from rest_framework import serializers
 from .models import Document
 from user.models import Category
-
+from scrap.models import DocumentScrap
+from django.utils import timezone
 
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
@@ -17,14 +18,10 @@ class DocumentListSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Document
-        fields = [
-            'id', 'doc_title', 'doc_type', 'doc_type_display',
-            'pub_date', 'dead_date', 'has_deadline',
-            'region_id', 'categories'
-        ]
+        fields = '__all__'
     
     def get_has_deadline(self, obj):
-        """마감일 존재 여부 (참여형 공문용)"""
+        # 마감일 존재 여부 (참여형 공문용)
         return obj.dead_date is not None
 
 
@@ -36,12 +33,7 @@ class DocumentSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Document
-        fields = [
-            'id', 'doc_title', 'doc_content', 'doc_type', 'doc_type_display',
-            'pub_date', 'dead_date', 'days_until_deadline',
-            'region_id', 'categories', 'image_url',
-            'created_at'
-        ]
+        fields = '__all__'
     
     def get_days_until_deadline(self, obj):
         # 마감일
@@ -50,3 +42,32 @@ class DocumentSerializer(serializers.ModelSerializer):
         
         diff = obj.dead_date.date() - timezone.now().date()
         return diff.days if diff.days >= 0 else -1
+
+# 유사 공문 추천
+class SimilarDocumentSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    doc_title = serializers.CharField(max_length=255)
+    preview_content = serializers.CharField()
+    pub_date = serializers.DateTimeField()
+    score = serializers.FloatField()
+
+class DocumentDetailWithSimilarSerializer(DocumentSerializer):
+    similar_documents = SimilarDocumentSerializer(many=True, read_only=True)
+
+    # class Meta(DocumentSerializer.Meta):
+    #     fields = DocumentSerializer.Meta.fields + ('similar_documents',)
+
+    class Meta:
+        model = Document
+        fields = '__all__'
+
+class DocumentScrapUpcomingSerializer(serializers.ModelSerializer):
+    """
+    마감일이 가까운 공문 스크랩 목록 조회를 위한 시리얼라이저
+    """
+    # nested serializer를 사용하여 스크랩된 Document의 상세 정보를 포함합니다.
+    document = DocumentSerializer(read_only=True)
+
+    class Meta:
+        model = DocumentScrap
+        fields = ['id', 'created_at', 'document']

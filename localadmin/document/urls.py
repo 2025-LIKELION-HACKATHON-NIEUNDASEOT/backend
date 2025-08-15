@@ -11,4 +11,7 @@ urlpatterns = [
     
     path('region/<int:region_id>/recent/', views.get_recent_region_news, name='recent_region_news'),
     path('categories/recent-alerts/', views.get_recent_category_alerts, name='recent_category_alerts'),
+    
+    path('upcoming-deadlines/', views.upcoming_deadlines_api, name='upcoming_document_deadlines'),
+    path('search/', views.all_documents_search_api, name='all_documents_search'),
 ]
