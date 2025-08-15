@@ -39,7 +39,7 @@ class DocumentListView(generics.ListAPIView):
         manual_parameters=[
             openapi.Parameter(
                 'region_id', openapi.IN_QUERY, 
-                description="관심 지역 ID (복수 선택: 6,83)", 
+                description="관심 지역 ID (복수 선택: 도봉구 6, 경기도 85)", 
                 type=openapi.TYPE_STRING
             ),
             openapi.Parameter(
