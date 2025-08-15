@@ -3,6 +3,11 @@ from .models                  import ChatbotScrap, DocumentScrap
 from document.models          import Category, Document, DocumentTypeChoices
 from region.models            import Region
 
+# 마감일 가까운 공문
+from django.utils import timezone
+from document.serializers import DocumentSerializer
+from .models import DocumentScrap
+
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
         model  = Category
@@ -124,12 +129,14 @@ class DocumentScrapListSerializer(serializers.ModelSerializer):
     region           = serializers.SerializerMethodField()
     categories       = serializers.SerializerMethodField()
     image_url        = serializers.CharField(source='document.image_url', read_only=True)
+    # 마감일 가까운 공문용 필드
+    dead_date = serializers.DateTimeField(source='document.dead_date', read_only=True)
 
     class Meta:
         model  = DocumentScrap
         fields = [
             'id', 'doc_title', 'doc_type', 'doc_type_display', 
-            'pub_date', 'region', 'categories', 'image_url', 'created_at'
+            'pub_date', 'region', 'categories', 'image_url', 'created_at', 'dead_date'
         ]
     
     def get_region(self, obj):

@@ -1,17 +1,25 @@
+from django.utils import timezone
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
 from django.db.models import Q
-from django.utils import timezone
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 import logging
+from datetime import date
 
 from .models import Document, DocumentTypeChoices
 from .services import DocumentService, DocumentDataProcessor
 from .services.seoul_api_service import SeoulAPIService, DocumentService as SeoulDocumentService
 from .serializers import DocumentSerializer, DocumentListSerializer, DocumentDetailWithSimilarSerializer
 from .utils import analyze_document_content, search_similar_documents_in_db, list_to_comma_separated_str, comma_separated_str_to_list
+
+from scrap.models import DocumentScrap
+from .serializers import DocumentScrapUpcomingSerializer #, DocumentScrapUpcomingSerializer를 새로 추가해야 합니다.
+from user.utils import get_current_user, create_success_response, create_error_response
+
+
+
 
 logger = logging.getLogger(__name__)
 
@@ -471,3 +479,150 @@ class DocumentDetailView(generics.RetrieveAPIView):
 
         return Response(response_data, status=status.HTTP_200_OK)
 
+
+
+
+# 새롭게 추가되는 뷰 함수
+
+@swagger_auto_schema(
+    method='get',
+    operation_summary="마감일이 가까운 스크랩 공문 목록 조회",
+    operation_description="""
+    현재 사용자가 스크랩한 공문 중 마감일이 가까운 순으로 최대 5개를 조회합니다.
+    **dead_date가 오늘 이후인 문서만 포함됩니다.**
+    """,
+    tags=['공문']
+)
+@api_view(['GET'])
+def upcoming_deadlines_api(request):
+    """
+    사용자가 스크랩한 공문 중 마감일이 가까운 순으로 5개 목록을 반환합니다.
+    """
+    try:
+        user = get_current_user()
+        
+        # 타임존 정보가 있는 현재 시각을 가져옵니다.
+        now = timezone.now()
+        
+        # 1. 현재 사용자가 스크랩한 공문(DocumentScrap) 중,
+        #    연결된 Document의 dead_date가 현재 시각 이후인 목록을 가져옵니다.
+        #    'document__dead_date__gt=now'로 마감일이 가까운 순으로 정렬합니다.
+        upcoming_scraps = DocumentScrap.objects.filter(
+            user=user,
+            document__dead_date__gt=now
+        ).select_related('document').order_by('document__dead_date')[:5]  # 상위 5개만 선택
+        
+        # 2. 결과 쿼리셋을 시리얼라이저를 통해 JSON으로 변환합니다.
+        serializer = DocumentScrapUpcomingSerializer(upcoming_scraps, many=True)
+        
+        # 3. 성공 응답을 반환합니다.
+        return Response(
+            create_success_response(
+                "마감일이 가까운 스크랩 공문 목록 조회 성공",
+                {"count": len(serializer.data), "results": serializer.data}
+            ),
+            status=status.HTTP_200_OK
+        )
+
+    except Exception as error:
+        # 오류 발생 시 에러 응답을 반환합니다.
+        return Response(
+            create_error_response(f"마감일이 가까운 스크랩 공문 목록 조회 실패: {str(error)}"),
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@swagger_auto_schema(
+    method='get',
+    operation_summary="모든 공문 목록 검색 및 필터링",
+    operation_description="""
+    다양한 쿼리 파라미터를 사용하여 모든 공문을 검색, 필터링, 정렬합니다.
+    주의: 이 API는 스크랩 여부와 상관없이 모든 공문을 조회합니다.
+    """,
+    tags=['공문'],
+    manual_parameters=[
+        # 새로운 'q' 파라미터를 추가했습니다.
+        openapi.Parameter('q', in_=openapi.IN_QUERY, type=openapi.TYPE_STRING, description="검색어 (제목, 내용, 키워드, 요약)"),
+        openapi.Parameter('doc_type', in_=openapi.IN_QUERY, type=openapi.TYPE_STRING, description="공문 타입", enum=[choice.value for choice in DocumentTypeChoices]),
+        openapi.Parameter('region_ids', in_=openapi.IN_QUERY, type=openapi.TYPE_STRING, description="쉼표로 구분된 지역 ID 목록 (예: '1,2,3')"),
+        openapi.Parameter('category_ids', in_=openapi.IN_QUERY, type=openapi.TYPE_STRING, description="쉼표로 구분된 카테고리 ID 목록 (예: '1,2,3')"),
+        openapi.Parameter('order', in_=openapi.IN_QUERY, type=openapi.TYPE_STRING, description="정렬 순서 ('latest' 또는 'oldest'), 기본값 latest", enum=['latest', 'oldest']),
+        openapi.Parameter('page', in_=openapi.IN_QUERY, type=openapi.TYPE_INTEGER, description="페이지 번호, 기본값 1"),
+        openapi.Parameter('page_size', in_=openapi.IN_QUERY, type=openapi.TYPE_INTEGER, description="페이지 크기, 기본값 10"),
+    ],
+)
+@api_view(['GET'])
+def all_documents_search_api(request):
+    """
+    쿼리 파라미터에 따라 모든 공문을 검색, 필터링, 정렬하여 반환합니다.
+    """
+    try:
+        # 쿼리 파라미터 가져오기 및 기본값 설정
+        q = request.query_params.get('q') # 새로운 검색어 파라미터
+        doc_type = request.query_params.get('doc_type')
+        region_ids_str = request.query_params.get('region_ids')
+        category_ids_str = request.query_params.get('category_ids')
+        order = request.query_params.get('order', 'latest')
+        page = int(request.query_params.get('page', 1))
+        page_size = int(request.query_params.get('page_size', 10))
+
+        # 모든 Document 객체로 시작합니다.
+        documents = Document.objects.all()
+        
+        # 필터링 조건 추가
+        filters = Q()
+        if q:
+            # 검색어 필터링을 추가합니다.
+            # Q 객체의 '|' 연산자를 사용하여 OR 조건을 만듭니다.
+            filters &= (
+                Q(doc_title__icontains=q) |
+                Q(doc_content__icontains=q) |
+                Q(keywords__icontains=q) |
+                Q(summary__icontains=q)
+            )
+
+        if doc_type:
+            filters &= Q(doc_type=doc_type)
+        
+        if region_ids_str:
+            region_ids = [int(id) for id in region_ids_str.split(',') if id]
+            if region_ids:
+                filters &= Q(region_id__in=region_ids)
+
+        if category_ids_str:
+            category_ids = [int(id) for id in category_ids_str.split(',') if id]
+            if category_ids:
+                filters &= Q(categories__id__in=category_ids)
+        
+        # 필터링 적용 및 중복 제거
+        filtered_documents = documents.filter(filters).distinct()
+
+        # 정렬 적용
+        if order == 'oldest':
+            filtered_documents = filtered_documents.order_by('pub_date')
+        else: # 기본값 'latest'
+            filtered_documents = filtered_documents.order_by('-pub_date')
+
+        # 페이지네이션 적용
+        offset = (page - 1) * page_size
+        paginated_documents = filtered_documents[offset:offset + page_size]
+        
+        # 결과 시리얼라이즈
+        serializer = DocumentSerializer(paginated_documents, many=True)
+
+        return Response(
+            create_success_response(
+                "공문 검색 성공",
+                {
+                    "count": filtered_documents.count(),
+                    "results": serializer.data
+                }
+            ),
+            status=status.HTTP_200_OK
+        )
+
+    except Exception as error:
+        return Response(
+            create_error_response(f"공문 검색 실패: {str(error)}"),
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
