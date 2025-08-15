@@ -1,5 +1,3 @@
-# yourapp/utils.py (개선된 코드)
-
 import google.generativeai as genai
 import json
 import time
@@ -66,7 +64,7 @@ def analyze_document_content(document_text, max_retries=3, base_delay=60):
     "related_departments": ["관련기관1"],
     "purpose": "목적 요약",
     "issue_date": "발행일",
-    "summary": "100자 이내 요약"
+    "summary": "최대 3문장 요약"
 }}
 
 공문: {document_text}"""
@@ -152,7 +150,7 @@ def batch_analyze_documents(document_ids, batch_size=5, delay_between_batches=12
                     doc.keywords = list_to_comma_separated_str(analysis_result.get('keywords', []))
                     doc.related_departments = list_to_comma_separated_str(analysis_result.get('related_departments', []))
                     doc.purpose = analysis_result.get('purpose', '')
-                    doc.summary = analysis_result.get('summary', '')
+                    doc.summary = analysis_result.get('summary', '') # 요약 필드 저장
                     doc.save()
                     
                     results.append({'id': doc_id, 'status': 'success'})
@@ -204,6 +202,9 @@ def search_similar_documents_in_db(analyzed_data, current_doc_id=None, limit=3):
         search_terms.extend(analyzed_data['related_departments'])
     if analyzed_data.get('purpose'):
         search_terms.append(analyzed_data['purpose'])
+    # 요약 내용도 검색 조건에 포함 (선택 사항)
+    if analyzed_data.get('summary'): 
+        search_terms.append(analyzed_data['summary'])
 
     query_string_parts = []
     for term in search_terms:
@@ -223,11 +224,11 @@ def search_similar_documents_in_db(analyzed_data, current_doc_id=None, limit=3):
         doc_title,
         SUBSTRING(doc_content, 1, 150) AS preview_content,
         pub_date,
-        MATCH(doc_title, doc_content, keywords, related_departments, purpose) AGAINST (%s IN NATURAL LANGUAGE MODE) AS score
+        MATCH(doc_title, doc_content, keywords, related_departments, purpose, summary) AGAINST (%s IN NATURAL LANGUAGE MODE) AS score
     FROM
-        yourapp_document
+        document
     WHERE
-        MATCH(doc_title, doc_content, keywords, related_departments, purpose) AGAINST (%s IN NATURAL LANGUAGE MODE)
+        MATCH(doc_title, doc_content, keywords, related_departments, purpose, summary) AGAINST (%s IN NATURAL LANGUAGE MODE)
         {'AND id != %s' if current_doc_id else ''}
     ORDER BY
         score DESC

@@ -4,6 +4,10 @@ from django.conf import settings
 from document.models import Document
 from user.models import Category, User
 from datetime import datetime
+from bs4 import BeautifulSoup
+from urllib.parse import urljoin, urlparse
+import re
+
 
 def get_default_guest_user():
     try:
@@ -86,6 +90,208 @@ def classify_doc_type(title, content):
         "type": type_result
     }
 
+
+def extract_file_info_from_html(html_content):
+    """HTML에서 첨부파일 정보와 bbs_docview 파라미터 추출"""
+    soup = BeautifulSoup(html_content, "html.parser")
+    file_info = []
+    
+    # bbs_docview 링크 찾기
+    docview_pattern = r"javascript:bbs_docview\('([^']+)','([^']+)','([^']+)'\)"
+    docview_matches = re.findall(docview_pattern, html_content)
+    
+    # 첨부파일 다운로드 링크 찾기
+    download_links = soup.find_all('a', href=re.compile(r'/WDB_common/include/download\.asp'))
+    
+    for link in download_links:
+        href = link.get('href')
+        # URL에서 fcode와 bcode 추출
+        fcode_match = re.search(r'fcode=(\d+)', href)
+        bcode_match = re.search(r'bcode=(\d+)', href)
+        
+        if fcode_match and bcode_match:
+            fcode = fcode_match.group(1)
+            bcode = bcode_match.group(1)
+            
+            # 파일명 추출 (title 속성에서)
+            title = link.get('title', '')
+            filename = title.split(' ')[0] if title else ''
+            
+            file_info.append({
+                'fcode': fcode,
+                'bcode': bcode,
+                'filename': filename,
+                'download_url': href
+            })
+    
+    return file_info, docview_matches
+
+
+def get_image_viewer_url(base_url, bcode, seq, fcode):
+    """bbs_docview 파라미터를 이용해 이미지 뷰어 URL 생성"""
+    # 도봉구 사이트의 이미지 뷰어 URL 패턴들
+    possible_patterns = [
+        f"{base_url}/WDB_common/include/file_view.asp?bcode={bcode}&seq={seq}&fcode={fcode}",
+        f"{base_url}/WDB_common/include/image_view.asp?bcode={bcode}&fcode={fcode}",
+        f"{base_url}/WDB_common/include/popup_view.asp?bcode={bcode}&seq={seq}&fcode={fcode}",
+        f"{base_url}/WDB_common/include/doc_view.asp?bcode={bcode}&seq={seq}&fcode={fcode}",
+        f"{base_url}/WDB_common/popup/file_view.asp?bcode={bcode}&fcode={fcode}",
+    ]
+    return possible_patterns
+
+
+def try_direct_image_access(base_url, fcode, bcode):
+    """첨부파일을 직접 이미지로 접근 시도"""
+    # 일반적인 첨부파일 직접 접근 패턴들
+    direct_patterns = [
+        f"{base_url}/WDB_common/upload/{bcode}/{fcode}",
+        f"{base_url}/upload/board/{bcode}/{fcode}",
+        f"{base_url}/files/{bcode}/{fcode}",
+        f"{base_url}/WDB_common/files/{bcode}/{fcode}.jpg",
+        f"{base_url}/WDB_common/files/{bcode}/{fcode}.png",
+    ]
+    
+    for pattern in direct_patterns:
+        try:
+            resp = requests.head(pattern, timeout=5)  # HEAD 요청으로 빠른 확인
+            if resp.status_code == 200 and 'image' in resp.headers.get('content-type', '').lower():
+                return pattern
+        except:
+            continue
+    return None
+
+
+def fetch_image_from_viewer_page(viewer_url):
+    """이미지 뷰어 페이지에서 실제 이미지 URL 추출"""
+    try:
+        print(f"이미지 뷰어 페이지 접근: {viewer_url}")
+        resp = requests.get(viewer_url, timeout=10)
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, "html.parser")
+        
+        # 이미지 뷰어 페이지에서 이미지 찾기
+        # 1. img 태그에서 직접 찾기
+        img_tags = soup.find_all('img')
+        for img in img_tags:
+            src = img.get('src', '')
+            # 버튼이나 아이콘이 아닌 실제 이미지 찾기
+            if src and not any(exclude in src.lower() for exclude in 
+                             ['btn_', 'icon_', 'logo', 'banner', 'header', 'footer', 'button']):
+                return urljoin(viewer_url, src)
+        
+        # 2. JavaScript에서 이미지 URL 찾기
+        script_tags = soup.find_all('script')
+        for script in script_tags:
+            if script.string:
+                # JavaScript 코드에서 이미지 URL 패턴 찾기
+                img_url_patterns = [
+                    r'src\s*=\s*["\']([^"\']*\.(jpg|jpeg|png|gif|bmp|webp))["\']',
+                    r'image\s*=\s*["\']([^"\']*\.(jpg|jpeg|png|gif|bmp|webp))["\']',
+                    r'url\s*=\s*["\']([^"\']*\.(jpg|jpeg|png|gif|bmp|webp))["\']'
+                ]
+                for pattern in img_url_patterns:
+                    matches = re.findall(pattern, script.string, re.IGNORECASE)
+                    if matches:
+                        return urljoin(viewer_url, matches[0][0])
+        
+        return None
+        
+    except Exception as e:
+        print(f"이미지 뷰어 페이지 접근 실패 ({viewer_url}): {e}")
+        return None
+
+
+def fetch_first_image(link_url):
+    """링크 페이지에서 실제 이미지 URL 가져오기 (완전 개선된 버전)"""
+    if not link_url:
+        return None
+        
+    print(f"이미지 추출 시작: {link_url}")
+    
+    try:
+        resp = requests.get(link_url, timeout=10)
+        resp.raise_for_status()
+        html_content = resp.text
+        
+        # URL 파싱으로 base_url 추출
+        parsed_url = urlparse(link_url)
+        base_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
+        
+        # 1. HTML에서 파일 정보와 docview 파라미터 추출
+        file_info_list, docview_matches = extract_file_info_from_html(html_content)
+        
+        print(f"추출된 파일 정보: {file_info_list}")
+        print(f"추출된 docview 파라미터: {docview_matches}")
+        
+        # 2. 이미지 파일 필터링 (확장자 기준)
+        image_files = []
+        for file_info in file_info_list:
+            filename = file_info['filename'].lower()
+            if any(filename.endswith(ext) for ext in ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp']):
+                image_files.append(file_info)
+        
+        print(f"이미지 파일들: {image_files}")
+        
+        # 3. docview 파라미터로 이미지 뷰어 접근 시도
+        for docview_match in docview_matches:
+            bcode, seq, fcode = docview_match
+            print(f"docview 파라미터로 시도: bcode={bcode}, seq={seq}, fcode={fcode}")
+            
+            # 이미지 뷰어 URL들 생성하여 시도
+            viewer_urls = get_image_viewer_url(base_url, bcode, seq, fcode)
+            
+            for viewer_url in viewer_urls:
+                image_url = fetch_image_from_viewer_page(viewer_url)
+                if image_url:
+                    print(f"이미지 뷰어에서 발견: {image_url}")
+                    return image_url
+        
+        # 4. 첨부파일 직접 접근 시도
+        for file_info in image_files:
+            fcode = file_info['fcode']
+            bcode = file_info['bcode']
+            
+            # 직접 이미지 접근 시도
+            direct_image_url = try_direct_image_access(base_url, fcode, bcode)
+            if direct_image_url:
+                print(f"직접 접근으로 발견: {direct_image_url}")
+                return direct_image_url
+        
+        # 5. 다운로드 링크를 이미지 URL로 시도 (일부 사이트에서 동작)
+        for file_info in image_files:
+            download_url = urljoin(base_url, file_info['download_url'])
+            try:
+                # HEAD 요청으로 content-type 확인
+                head_resp = requests.head(download_url, timeout=5)
+                if head_resp.status_code == 200:
+                    content_type = head_resp.headers.get('content-type', '').lower()
+                    if 'image' in content_type:
+                        print(f"다운로드 링크가 이미지: {download_url}")
+                        return download_url
+            except:
+                continue
+        
+        # 6. 일반적인 이미지 태그 확인 (로고 등 제외)
+        soup = BeautifulSoup(html_content, "html.parser")
+        img_tags = soup.find_all("img")
+        for img_tag in img_tags:
+            src = img_tag.get("src")
+            if src:
+                # 더 엄격한 필터링
+                src_lower = src.lower()
+                if (not any(exclude in src_lower for exclude in 
+                           ['btn_', 'icon_', 'logo', 'banner', 'header', 'footer', 'button', 'nav']) and
+                    any(ext in src_lower for ext in ['.jpg', '.jpeg', '.png', '.gif'])):
+                    return urljoin(link_url, src)
+        
+        print("이미지를 찾을 수 없습니다.")
+        return None
+        
+    except Exception as e:
+        print(f"이미지 추출 실패 ({link_url}): {e}")
+        return None
+
+
 def save_notices_to_db(notices, user):
     region = None
     if hasattr(user, 'profile'):
@@ -123,7 +329,8 @@ def save_notices_to_db(notices, user):
                 doc_content=notice.get('description', ''),
                 doc_type=result['type'],
                 pub_date=pub_date,
-                region_id=region_id
+                region_id=region_id,
+                image_url=fetch_first_image(notice.get('link'))
             )
             print("저장 완료:", doc.id)
 

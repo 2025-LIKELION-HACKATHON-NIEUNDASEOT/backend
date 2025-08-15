@@ -77,6 +77,11 @@ class Document(BaseTimeStampModel):
         null=True, 
         blank=True
     )
+    # 요약 필드 추가
+    summary = models.TextField(
+        null=True, 
+        blank=True
+    )
 
     class Meta:
         db_table             = 'document'

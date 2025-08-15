@@ -425,15 +425,15 @@ class DocumentDetailView(generics.RetrieveAPIView):
         
         # 1. 캐싱된 분석 데이터 확인 및 사용
         analyzed_data = {}
-        # keywords 필드가 비어있지 않다면, 이미 분석된 것으로 간주
-        if instance.keywords and instance.related_departments and instance.purpose:
+        # keywords, related_departments, purpose, summary 필드가 비어있지 않다면, 이미 분석된 것으로 간주
+        if instance.keywords and instance.related_departments and instance.purpose and instance.summary:
             print(f"--- Document ID {instance.id}: 캐싱된 분석 데이터 사용 ---")
             analyzed_data = {
                 "title": instance.doc_title, # 제목은 항상 사용
                 "keywords": comma_separated_str_to_list(instance.keywords),
                 "related_departments": comma_separated_str_to_list(instance.related_departments),
-                "purpose": instance.purpose
-                # issue_date, summary는 검색에 직접 사용되지 않으므로 포함하지 않아도 됨
+                "purpose": instance.purpose,
+                "summary": instance.summary # 캐싱된 요약 데이터 포함
             }
         else:
             # 2. 캐싱된 데이터가 없으면 Gemini API 호출하여 분석
@@ -445,17 +445,18 @@ class DocumentDetailView(generics.RetrieveAPIView):
                 analyzed_data = gemini_result
                 
                 # 3. 분석 결과 DB에 저장 (캐싱)
-                instance.keywords = list_to_comma_separated_str(gemini_result.get('keywords'))
-                instance.related_departments = list_to_comma_separated_str(gemini_result.get('related_departments'))
-                instance.purpose = gemini_result.get('purpose')
+                instance.keywords = list_to_comma_separated_str(gemini_result.get('keywords', []))
+                instance.related_departments = list_to_comma_separated_str(gemini_result.get('related_departments', []))
+                instance.purpose = gemini_result.get('purpose', '')
+                instance.summary = gemini_result.get('summary', '') # Gemini에서 반환된 요약 저장
                 
                 try:
-                    instance.save(update_fields=['keywords', 'related_departments', 'purpose'])
-                    print(f"--- Document ID {instance.id}: 분석 결과 DB에 저장 완료 ---")
+                    instance.save(update_fields=['keywords', 'related_departments', 'purpose', 'summary'])
+                    print(f"--- Document ID {instance.id}: 분석 결과 DB에 저장 완료 (요약 포함) ---")
                 except Exception as e:
                     print(f"--- Document ID {instance.id}: 분석 결과 DB 저장 중 오류 발생: {e} ---")
             else:
-                print(f"--- Document ID {instance.id}: Gemini 분석 실패. 유사 공문 추천 불가. ---")
+                print(f"--- Document ID {instance.id}: Gemini 분석 실패. 유사 공문 추천 및 요약 불가. ---")
                 # Gemini 분석 실패 시, analyzed_data는 비어있는 상태로 유지되어 유사 공문 검색을 건너뜀
 
         similar_docs_data = []
@@ -469,3 +470,4 @@ class DocumentDetailView(generics.RetrieveAPIView):
         response_data['similar_documents'] = similar_docs_data
 
         return Response(response_data, status=status.HTTP_200_OK)
+

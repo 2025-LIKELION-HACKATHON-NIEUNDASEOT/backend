@@ -3,7 +3,10 @@ from django.utils import timezone
 from django.core.exceptions import ValidationError
 from typing import Dict, List, Optional, Any
 import logging
-
+from bs4 import BeautifulSoup
+from urllib.parse import urljoin, urlparse
+from datetime import datetime
+import requests
 from document.models import Document, DocumentTypeChoices
 from user.models import Category
 
@@ -64,37 +67,39 @@ class DocumentService:
             pub_date=document_data.get('pub_date')
         ).exists()
 
-
 class DocumentDataProcessor:
-    #api에서 가져온 데이터를 Document 모델에 맞게 변환
-    
-    # 기능명세서 기준 4가지 타입
     TYPE_MAPPING = {
-        '참여': DocumentTypeChoices.PARTICIPATION,  # 참여 유도형 (행사, 설문)
-        '공지': DocumentTypeChoices.NOTICE,          # 공지형 (행정제도 안내, 통보)
-        '보고': DocumentTypeChoices.REPORT,          # 보고형 (사업 결과, 예산 집행)
-        '고시': DocumentTypeChoices.ANNOUNCEMENT,    # 법적 고시/공고형 (입법예고, 조례개정)
-        '공고': DocumentTypeChoices.ANNOUNCEMENT,
+        '참여': 'participation',
+        '공지': 'notice',
+        '보고': 'report',
+        '고시': 'announcement',
+        '공고': 'announcement',
     }
-    
-    @staticmethod
-    def process_api_data(api_data: Dict[str, Any], region_id: int) -> Dict[str, Any]:
-        # API 데이터 > Document 모델 형식으로 변환
-        try:
-            doc_title = api_data.get('ROW_TITLE', api_data.get('title', ''))
-            doc_content = api_data.get('ROW_CONTENT', api_data.get('content', ''))
-            pub_date = DocumentDataProcessor._parse_date(api_data.get('ROW_DATE', api_data.get('pub_date', '')))
-            department = api_data.get('ROW_DEPT', api_data.get('department', ''))
-            link_url = api_data.get('ROW_URL', api_data.get('link_url', ''))
 
-            if not doc_title:
-                doc_title = api_data.get('doc_title', '')
-            if not doc_content:
-                doc_content = api_data.get('doc_content', '')
+    @staticmethod
+    def process_api_data(api_data: Dict[str, Any], region_id: int) -> Optional[Dict[str, Any]]:
+        try:
+            link_url = api_data.get('LINK') or api_data.get('ROW_URL') or api_data.get('link_url', '')
+            base_url = ''
+            if link_url:
+                parsed_url = urlparse(link_url)
+                base_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
+
+            doc_title = api_data.get('TITLE') or api_data.get('ROW_TITLE') or ''
+            doc_content = api_data.get('DESCRIPTION') or api_data.get('ROW_CONTENT') or ''
+            pub_date = DocumentDataProcessor._parse_date(api_data.get('PUBDATE') or api_data.get('ROW_DATE'))
+            department = api_data.get('DEPARTMENT') or api_data.get('ROW_DEPT', '')
 
             if not doc_title or not doc_content:
                 logger.warning("Skipping document due to missing title or content.")
                 return None
+
+            # 1) DESCRIPTION에서 이미지 추출
+            image_url = DocumentDataProcessor.extract_image_url(doc_content, base_url)
+
+            # 2) 이미지 없으면 LINK 페이지에서 추출
+            if not image_url and link_url:
+                image_url = DocumentDataProcessor.extract_image_from_link(link_url)
 
             processed_data = {
                 'doc_title': doc_title,
@@ -102,102 +107,117 @@ class DocumentDataProcessor:
                 'pub_date': pub_date,
                 'region_id': region_id,
                 'is_active': True,
-                'image_url': api_data.get('image_url', api_data.get('attachment_url', '')),
+                'image_url': image_url,
                 'department': department,
-                'link_url': link_url
+                'link_url': link_url,
             }
-            
-            # 4가지 타입 분류
+
+            # 문서 타입 분류
             processed_data['doc_type'] = DocumentDataProcessor._determine_doc_type(
-                api_data.get('category', ''),
-                processed_data['doc_title']
+                api_data.get('CATEGORY', ''), doc_title
             )
-            
-            # 마감일
-            if processed_data['doc_type'] == DocumentTypeChoices.PARTICIPATION:
+
+            # 참여형이면 마감일 처리
+            if processed_data['doc_type'] == 'participation':
                 processed_data['dead_date'] = DocumentDataProcessor._parse_date(
-                    api_data.get('deadline', api_data.get('dead_date', ''))
+                    api_data.get('DEADLINE')
                 )
-            
+
             # 카테고리
             processed_data['categories'] = DocumentDataProcessor._get_categories(
-                api_data.get('category', ''),
-                processed_data['department']
+                api_data.get('CATEGORY', ''), department
             )
-            
+
             return processed_data
-            
+
         except Exception as e:
             logger.error(f"Error processing API data: {e}")
             raise ValidationError(f"데이터 처리 중 오류가 발생했습니다: {str(e)}")
 
     @staticmethod
+    def extract_image_url(html_content: str, base_url: str) -> Optional[str]:
+        """본문 HTML에서 이미지 추출"""
+        soup = BeautifulSoup(html_content or '', "html.parser")
+
+        img_tag = soup.find("img")
+        if img_tag and img_tag.get("src"):
+            return urljoin(base_url, img_tag["src"])
+
+        for a_tag in soup.find_all("a", href=True):
+            href = a_tag["href"].lower()
+            if href.endswith((".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp")):
+                return urljoin(base_url, href)
+
+        return None
+
+    @staticmethod
+    def extract_image_from_link(link_url: str) -> Optional[str]:
+        """<LINK> 페이지에서 첫 번째 이미지 추출"""
+        try:
+            resp = requests.get(link_url, timeout=5)
+            resp.raise_for_status()
+            soup = BeautifulSoup(resp.text, "html.parser")
+            img_tag = soup.find("img")
+            if img_tag and img_tag.get("src"):
+                base_url = f"{urlparse(link_url).scheme}://{urlparse(link_url).netloc}"
+                return urljoin(base_url, img_tag["src"])
+        except Exception as e:
+            logger.warning(f"Failed to fetch image from link {link_url}: {e}")
+        return None
+
+    @staticmethod
     def _parse_date(date_string: Any) -> Optional[timezone.datetime]:
         if not date_string:
             return None
-            
         try:
+            from django.utils.dateparse import parse_datetime, parse_date
             if isinstance(date_string, str):
-                from django.utils.dateparse import parse_datetime, parse_date
-                
                 parsed = parse_datetime(date_string)
                 if parsed:
-                    return parsed
-                
+                    return timezone.make_aware(parsed)
                 parsed_date = parse_date(date_string)
                 if parsed_date:
-                    return timezone.datetime.combine(parsed_date, timezone.datetime.min.time())
-                    
-            return date_string if isinstance(date_string, timezone.datetime) else None
-            
+                    return timezone.make_aware(
+                        timezone.datetime.combine(parsed_date, timezone.datetime.min.time())
+                    )
+            elif isinstance(date_string, timezone.datetime):
+                return timezone.make_aware(date_string) if timezone.is_naive(date_string) else date_string
+            return None
         except Exception as e:
             logger.warning(f"Date parsing failed for {date_string}: {e}")
             return None
-    
+
     @staticmethod
     def _determine_doc_type(category: str, title: str) -> str:
-        text_to_check = f"{category} {title}".lower()
-        
-        participation_keywords = ['참여', '모집', '신청', '접수', '공모', '설문', '행사', '이벤트']
-        report_keywords = ['보고', '현황', '결과', '실적', '예산', '집행', '성과']
-        announcement_keywords = ['고시', '공고', '입법', '예고', '조례', '개정', '규정', '법령']
-        notice_keywords = ['공지', '안내', '통보', '알림', '제도', '변경', '시행']
-        
-        if any(keyword in text_to_check for keyword in participation_keywords):
-            return DocumentTypeChoices.PARTICIPATION
-        elif any(keyword in text_to_check for keyword in report_keywords):
-            return DocumentTypeChoices.REPORT
-        elif any(keyword in text_to_check for keyword in announcement_keywords):
-            return DocumentTypeChoices.ANNOUNCEMENT
+        text = f"{category} {title}".lower()
+        if any(k in text for k in ['참여', '모집', '신청', '접수', '공모', '설문', '행사', '이벤트']):
+            return 'participation'
+        elif any(k in text for k in ['보고', '현황', '결과', '실적', '예산', '집행', '성과']):
+            return 'report'
+        elif any(k in text for k in ['고시', '공고', '입법', '예고', '조례', '개정', '규정', '법령']):
+            return 'announcement'
         else:
-            return DocumentTypeChoices.NOTICE
-    
+            return 'notice'
+
     @staticmethod
     def _get_categories(category_str: str, department: str) -> List[int]:
-        try:
-            category_mapping = {
-                '문화': ['문화', '예술', '공연', '전시', '축제', '영화', '음악', '행사'],
-                '주택': ['주택', '부동산', '아파트', '주거', '임대', '전세', '매매', '재개발', '재건축'],
-                '경제': ['경제', '상권', '소상공인', '창업', '일자리', '고용', '세금', '금융', '투자'],
-                '환경': ['환경', '재활용', '쓰레기', '청소', '녹지', '공해', '기후', '온실가스'],
-                '안전': ['안전', '방범', '방재', '소방', '구조', '경보', '교통사고', '재난', '응급'],
-                '복지': ['복지', '지원', '혜택', '돌봄', '보조', '급여', '장애인', '노인', '아동'],
-                '행정': ['행정', '민원', '허가', '신청', '접수', '발급', '제도', '정책', '조례']
-            }
-            
-            text_to_check = f"{category_str} {department}".lower()
-            matched_categories = []
-            
-            for category_name, keywords in category_mapping.items():
-                if any(keyword in text_to_check for keyword in keywords):
-                    try:
-                        category = Category.objects.get(name=category_name)
-                        matched_categories.append(category.id)
-                    except Category.DoesNotExist:
-                        continue
-            
-            return matched_categories
-            
-        except Exception as e:
-            logger.warning(f"Category matching failed: {e}")
-            return []
+        from user.models import Category
+        category_mapping = {
+            '문화': ['문화', '예술', '공연', '전시', '축제', '영화', '음악', '행사'],
+            '주택': ['주택', '부동산', '아파트', '주거', '임대', '전세', '매매', '재개발', '재건축'],
+            '경제': ['경제', '상권', '소상공인', '창업', '일자리', '고용', '세금', '금융', '투자'],
+            '환경': ['환경', '재활용', '쓰레기', '청소', '녹지', '공해', '기후', '온실가스'],
+            '안전': ['안전', '방범', '방재', '소방', '구조', '경보', '교통사고', '재난', '응급'],
+            '복지': ['복지', '지원', '혜택', '돌봄', '보조', '급여', '장애인', '노인', '아동'],
+            '행정': ['행정', '민원', '허가', '신청', '접수', '발급', '제도', '정책', '조례']
+        }
+        text = f"{category_str} {department}".lower()
+        matched_categories = []
+        for cat_name, keywords in category_mapping.items():
+            if any(k in text for k in keywords):
+                try:
+                    category = Category.objects.get(name=cat_name)
+                    matched_categories.append(category.id)
+                except Category.DoesNotExist:
+                    continue
+        return matched_categories
