@@ -1,6 +1,6 @@
 from django.db import models
 from user.models import User, Category, BaseTimeStampModel
-
+from region.models import Region
 
 class DocumentTypeChoices(models.TextChoices):
     # 문서 타입 선택

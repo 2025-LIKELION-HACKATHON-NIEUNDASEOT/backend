@@ -26,22 +26,32 @@ def get_openapi_key_for_user(user):
         region = getattr(user.profile, 'region', None)
         if isinstance(region, dict):
             city = region.get('city')
+            district = region.get('district')
             if city == '경기도':
                 return settings.GYEONGGI_OPENAPI_KEY
+            elif district == '종로구':
+                return settings.JONGNO_OPENAPI_KEY
     # 기본 도봉구 키
     return settings.DOBONG_OPENAPI_KEY
 
 def fetch_notices_for_user(user, start_index=1, end_index=5):
     key = get_openapi_key_for_user(user)
-    api_name = 'DobongNewsNoticeList'
+    api_name = 'DobongNewsNoticeList'  # 기본값
+
     if hasattr(user, 'profile'):
         region = getattr(user.profile, 'region', None)
-        if isinstance(region, dict) and region.get('city') == '경기도':
-            api_name = 'GyeonggiNewsNoticeList'
-    
+        if region:
+            if region.city == '경기도':
+                api_name = 'GyeonggiNewsNoticeList'
+            elif region.city == '서울특별시' and region.district == '도봉구':
+                api_name = 'DobongNewsNoticeList'
+            elif region.city == '서울특별시' and region.district == '종로구':
+                api_name = 'JongnoNewsNoticeList'
+
     url = f"http://openapi.seoul.go.kr:8088/{key}/xml/{api_name}/{start_index}/{end_index}/"
-    print(f"API 요청 URL: {url}")  # <== 이 줄 추가
+    print(f"API 요청 URL: {url}")
     response = requests.get(url)
+    print(f"사용 중인 키: {key}")
     response.raise_for_status()
     return response.text
 
@@ -96,7 +106,7 @@ def extract_file_info_from_html(html_content):
     soup = BeautifulSoup(html_content, "html.parser")
     file_info = []
     
-    # bbs_docview 링크 찾기
+    # bbs_docview 링크
     docview_pattern = r"javascript:bbs_docview\('([^']+)','([^']+)','([^']+)'\)"
     docview_matches = re.findall(docview_pattern, html_content)
     
@@ -113,7 +123,7 @@ def extract_file_info_from_html(html_content):
             fcode = fcode_match.group(1)
             bcode = bcode_match.group(1)
             
-            # 파일명 추출 (title 속성에서)
+            # 파일명 추출
             title = link.get('title', '')
             filename = title.split(' ')[0] if title else ''
             
@@ -129,7 +139,6 @@ def extract_file_info_from_html(html_content):
 
 def get_image_viewer_url(base_url, bcode, seq, fcode):
     """bbs_docview 파라미터를 이용해 이미지 뷰어 URL 생성"""
-    # 도봉구 사이트의 이미지 뷰어 URL 패턴들
     possible_patterns = [
         f"{base_url}/WDB_common/include/file_view.asp?bcode={bcode}&seq={seq}&fcode={fcode}",
         f"{base_url}/WDB_common/include/image_view.asp?bcode={bcode}&fcode={fcode}",
@@ -141,8 +150,7 @@ def get_image_viewer_url(base_url, bcode, seq, fcode):
 
 
 def try_direct_image_access(base_url, fcode, bcode):
-    """첨부파일을 직접 이미지로 접근 시도"""
-    # 일반적인 첨부파일 직접 접근 패턴들
+    # 첨부파일 직접 접근
     direct_patterns = [
         f"{base_url}/WDB_common/upload/{bcode}/{fcode}",
         f"{base_url}/upload/board/{bcode}/{fcode}",
@@ -153,7 +161,7 @@ def try_direct_image_access(base_url, fcode, bcode):
     
     for pattern in direct_patterns:
         try:
-            resp = requests.head(pattern, timeout=5)  # HEAD 요청으로 빠른 확인
+            resp = requests.head(pattern, timeout=5)
             if resp.status_code == 200 and 'image' in resp.headers.get('content-type', '').lower():
                 return pattern
         except:
@@ -170,20 +178,16 @@ def fetch_image_from_viewer_page(viewer_url):
         soup = BeautifulSoup(resp.text, "html.parser")
         
         # 이미지 뷰어 페이지에서 이미지 찾기
-        # 1. img 태그에서 직접 찾기
         img_tags = soup.find_all('img')
         for img in img_tags:
             src = img.get('src', '')
-            # 버튼이나 아이콘이 아닌 실제 이미지 찾기
             if src and not any(exclude in src.lower() for exclude in 
                              ['btn_', 'icon_', 'logo', 'banner', 'header', 'footer', 'button']):
                 return urljoin(viewer_url, src)
         
-        # 2. JavaScript에서 이미지 URL 찾기
         script_tags = soup.find_all('script')
         for script in script_tags:
             if script.string:
-                # JavaScript 코드에서 이미지 URL 패턴 찾기
                 img_url_patterns = [
                     r'src\s*=\s*["\']([^"\']*\.(jpg|jpeg|png|gif|bmp|webp))["\']',
                     r'image\s*=\s*["\']([^"\']*\.(jpg|jpeg|png|gif|bmp|webp))["\']',
@@ -213,17 +217,17 @@ def fetch_first_image(link_url):
         resp.raise_for_status()
         html_content = resp.text
         
-        # URL 파싱으로 base_url 추출
+        # URL 파싱 > base_url 추출
         parsed_url = urlparse(link_url)
         base_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
         
-        # 1. HTML에서 파일 정보와 docview 파라미터 추출
+        # HTML에서 파일 정보와 docview 파라미터 추출
         file_info_list, docview_matches = extract_file_info_from_html(html_content)
         
         print(f"추출된 파일 정보: {file_info_list}")
         print(f"추출된 docview 파라미터: {docview_matches}")
         
-        # 2. 이미지 파일 필터링 (확장자 기준)
+        # 이미지 파일 필터링 jpg png 등
         image_files = []
         for file_info in file_info_list:
             filename = file_info['filename'].lower()
@@ -232,12 +236,11 @@ def fetch_first_image(link_url):
         
         print(f"이미지 파일들: {image_files}")
         
-        # 3. docview 파라미터로 이미지 뷰어 접근 시도
+        # docview 매개변수
         for docview_match in docview_matches:
             bcode, seq, fcode = docview_match
             print(f"docview 파라미터로 시도: bcode={bcode}, seq={seq}, fcode={fcode}")
             
-            # 이미지 뷰어 URL들 생성하여 시도
             viewer_urls = get_image_viewer_url(base_url, bcode, seq, fcode)
             
             for viewer_url in viewer_urls:
@@ -246,22 +249,19 @@ def fetch_first_image(link_url):
                     print(f"이미지 뷰어에서 발견: {image_url}")
                     return image_url
         
-        # 4. 첨부파일 직접 접근 시도
         for file_info in image_files:
             fcode = file_info['fcode']
             bcode = file_info['bcode']
             
-            # 직접 이미지 접근 시도
             direct_image_url = try_direct_image_access(base_url, fcode, bcode)
             if direct_image_url:
                 print(f"직접 접근으로 발견: {direct_image_url}")
                 return direct_image_url
         
-        # 5. 다운로드 링크를 이미지 URL로 시도 (일부 사이트에서 동작)
+        # 다운로드 링크
         for file_info in image_files:
             download_url = urljoin(base_url, file_info['download_url'])
             try:
-                # HEAD 요청으로 content-type 확인
                 head_resp = requests.head(download_url, timeout=5)
                 if head_resp.status_code == 200:
                     content_type = head_resp.headers.get('content-type', '').lower()
@@ -271,13 +271,11 @@ def fetch_first_image(link_url):
             except:
                 continue
         
-        # 6. 일반적인 이미지 태그 확인 (로고 등 제외)
         soup = BeautifulSoup(html_content, "html.parser")
         img_tags = soup.find_all("img")
         for img_tag in img_tags:
             src = img_tag.get("src")
             if src:
-                # 더 엄격한 필터링
                 src_lower = src.lower()
                 if (not any(exclude in src_lower for exclude in 
                            ['btn_', 'icon_', 'logo', 'banner', 'header', 'footer', 'button', 'nav']) and

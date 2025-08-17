@@ -62,10 +62,6 @@ class DocumentDetailWithSimilarSerializer(DocumentSerializer):
         fields = '__all__'
 
 class DocumentScrapUpcomingSerializer(serializers.ModelSerializer):
-    """
-    마감일이 가까운 공문 스크랩 목록 조회를 위한 시리얼라이저
-    """
-    # nested serializer를 사용하여 스크랩된 Document의 상세 정보를 포함합니다.
     document = DocumentSerializer(read_only=True)
 
     class Meta:

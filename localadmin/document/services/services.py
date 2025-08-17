@@ -14,7 +14,6 @@ logger = logging.getLogger(__name__)
 
 
 class DocumentService:
-    #공문 데이터 관리 서비스
     
     @staticmethod
     def create_document(document_data: Dict[str, Any]) -> Document:
@@ -41,7 +40,6 @@ class DocumentService:
             with transaction.atomic():
                 for doc_data in documents_data:
                     try:
-                        # 중복 체크 (제목 + 지역 + 게시일 기준)
                         if not DocumentService._is_duplicate(doc_data):
                             document = DocumentService.create_document(doc_data)
                             created_documents.append(document)
@@ -94,10 +92,8 @@ class DocumentDataProcessor:
                 logger.warning("Skipping document due to missing title or content.")
                 return None
 
-            # 1) DESCRIPTION에서 이미지 추출
             image_url = DocumentDataProcessor.extract_image_url(doc_content, base_url)
 
-            # 2) 이미지 없으면 LINK 페이지에서 추출
             if not image_url and link_url:
                 image_url = DocumentDataProcessor.extract_image_from_link(link_url)
 
@@ -112,7 +108,6 @@ class DocumentDataProcessor:
                 'link_url': link_url,
             }
 
-            # 문서 타입 분류
             processed_data['doc_type'] = DocumentDataProcessor._determine_doc_type(
                 api_data.get('CATEGORY', ''), doc_title
             )
@@ -123,7 +118,6 @@ class DocumentDataProcessor:
                     api_data.get('DEADLINE')
                 )
 
-            # 카테고리
             processed_data['categories'] = DocumentDataProcessor._get_categories(
                 api_data.get('CATEGORY', ''), department
             )

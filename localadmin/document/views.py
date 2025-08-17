@@ -15,7 +15,7 @@ from .serializers import DocumentSerializer, DocumentListSerializer, DocumentDet
 from .utils import analyze_document_content, search_similar_documents_in_db, list_to_comma_separated_str, comma_separated_str_to_list
 
 from scrap.models import DocumentScrap
-from .serializers import DocumentScrapUpcomingSerializer #, DocumentScrapUpcomingSerializer를 새로 추가해야 합니다.
+from .serializers import DocumentScrapUpcomingSerializer
 from user.utils import get_current_user, create_success_response, create_error_response
 
 
@@ -127,7 +127,7 @@ class DocumentListView(generics.ListAPIView):
             ),
             'api_key': openapi.Schema(
                 type=openapi.TYPE_STRING, 
-                description='서울시 API 키 (선택사항, settings에서 가져옴)',
+                description='서울시 API 키',
             ),
             'start_idx': openapi.Schema(
                 type=openapi.TYPE_INTEGER, 
@@ -150,7 +150,6 @@ class DocumentListView(generics.ListAPIView):
 )
 @api_view(['POST'])
 def sync_seoul_api_data(request):
-    """서울시 OpenAPI 데이터 동기화"""
     try:
         region_id = request.data.get('region_id')
         service_name = request.data.get('service_name')
@@ -164,7 +163,6 @@ def sync_seoul_api_data(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # API
         api_service = SeoulAPIService(api_key)
         
         api_data = api_service.fetch_documents_from_api(
@@ -234,7 +232,6 @@ def sync_seoul_api_data(request):
 )
 @api_view(['POST'])
 def save_documents_from_api(request):
-    """외부 API에서 가져온 공문 데이터 일괄 저장 (기존 방식)"""
     try:
         region_id = request.data.get('region_id')
         raw_documents = request.data.get('documents', [])
@@ -245,13 +242,11 @@ def save_documents_from_api(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # 데이터 처리 -4가지 타입
         processed_documents = []
         for raw_doc in raw_documents:
             processed_doc = DocumentDataProcessor.process_api_data(raw_doc, region_id)
             processed_documents.append(processed_doc)
         
-        # 일괄 저장
         created_documents = DocumentService.bulk_create_documents(processed_documents)
         
         return Response({
@@ -285,7 +280,6 @@ def save_documents_from_api(request):
 )
 @api_view(['GET'])
 def check_seoul_api_status(request):
-    """서울시 API 서비스 상태 확인"""
     try:
         service_name = request.query_params.get('service_name')
         
@@ -431,20 +425,20 @@ class DocumentDetailView(generics.RetrieveAPIView):
     def get(self, request, *args, **kwargs):
         instance = self.get_object()
         
-        # 1. 캐싱된 분석 데이터 확인 및 사용
+        # 캐싱된 거 사용
         analyzed_data = {}
-        # keywords, related_departments, purpose, summary 필드가 비어있지 않다면, 이미 분석된 것으로 간주
-        if instance.keywords and instance.related_departments and instance.purpose and instance.summary:
+        # keywords만 있어도
+        if instance.keywords:
             print(f"--- Document ID {instance.id}: 캐싱된 분석 데이터 사용 ---")
             analyzed_data = {
                 "title": instance.doc_title, # 제목은 항상 사용
                 "keywords": comma_separated_str_to_list(instance.keywords),
                 "related_departments": comma_separated_str_to_list(instance.related_departments),
                 "purpose": instance.purpose,
-                "summary": instance.summary # 캐싱된 요약 데이터 포함
+                "summary": instance.summary
             }
         else:
-            # 2. 캐싱된 데이터가 없으면 Gemini API 호출하여 분석
+            # 캐싱x > Gemini API 호출하여 분석
             print(f"--- Document ID {instance.id}: Gemini API 호출하여 분석 ---")
             document_content = instance.doc_content
             gemini_result = analyze_document_content(document_content)
@@ -452,7 +446,6 @@ class DocumentDetailView(generics.RetrieveAPIView):
             if gemini_result:
                 analyzed_data = gemini_result
                 
-                # 3. 분석 결과 DB에 저장 (캐싱)
                 instance.keywords = list_to_comma_separated_str(gemini_result.get('keywords', []))
                 instance.related_departments = list_to_comma_separated_str(gemini_result.get('related_departments', []))
                 instance.purpose = gemini_result.get('purpose', '')
@@ -465,10 +458,9 @@ class DocumentDetailView(generics.RetrieveAPIView):
                     print(f"--- Document ID {instance.id}: 분석 결과 DB 저장 중 오류 발생: {e} ---")
             else:
                 print(f"--- Document ID {instance.id}: Gemini 분석 실패. 유사 공문 추천 및 요약 불가. ---")
-                # Gemini 분석 실패 시, analyzed_data는 비어있는 상태로 유지되어 유사 공문 검색을 건너뜀
 
         similar_docs_data = []
-        if analyzed_data: # 분석된 데이터가 있을 경우에만 유사 공문 검색
+        if analyzed_data:
             print(f"--- Document ID {instance.id}: 유사 공문 검색 시작 ---")
             similar_docs_data = search_similar_documents_in_db(analyzed_data, current_doc_id=instance.id, limit=3)
             print(f"--- Document ID {instance.id}: 최종 유사 공문 검색 결과: {len(similar_docs_data)}개 ---")
@@ -478,11 +470,6 @@ class DocumentDetailView(generics.RetrieveAPIView):
         response_data['similar_documents'] = similar_docs_data
 
         return Response(response_data, status=status.HTTP_200_OK)
-
-
-
-
-# 새롭게 추가되는 뷰 함수
 
 @swagger_auto_schema(
     method='get',
@@ -495,27 +482,18 @@ class DocumentDetailView(generics.RetrieveAPIView):
 )
 @api_view(['GET'])
 def upcoming_deadlines_api(request):
-    """
-    사용자가 스크랩한 공문 중 마감일이 가까운 순으로 5개 목록을 반환합니다.
-    """
     try:
         user = get_current_user()
         
-        # 타임존 정보가 있는 현재 시각을 가져옵니다.
         now = timezone.now()
         
-        # 1. 현재 사용자가 스크랩한 공문(DocumentScrap) 중,
-        #    연결된 Document의 dead_date가 현재 시각 이후인 목록을 가져옵니다.
-        #    'document__dead_date__gt=now'로 마감일이 가까운 순으로 정렬합니다.
         upcoming_scraps = DocumentScrap.objects.filter(
             user=user,
             document__dead_date__gt=now
-        ).select_related('document').order_by('document__dead_date')[:5]  # 상위 5개만 선택
+        ).select_related('document').order_by('document__dead_date')[:5]
         
-        # 2. 결과 쿼리셋을 시리얼라이저를 통해 JSON으로 변환합니다.
         serializer = DocumentScrapUpcomingSerializer(upcoming_scraps, many=True)
         
-        # 3. 성공 응답을 반환합니다.
         return Response(
             create_success_response(
                 "마감일이 가까운 스크랩 공문 목록 조회 성공",
@@ -525,7 +503,6 @@ def upcoming_deadlines_api(request):
         )
 
     except Exception as error:
-        # 오류 발생 시 에러 응답을 반환합니다.
         return Response(
             create_error_response(f"마감일이 가까운 스크랩 공문 목록 조회 실패: {str(error)}"),
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -541,7 +518,6 @@ def upcoming_deadlines_api(request):
     """,
     tags=['공문'],
     manual_parameters=[
-        # 새로운 'q' 파라미터를 추가했습니다.
         openapi.Parameter('q', in_=openapi.IN_QUERY, type=openapi.TYPE_STRING, description="검색어 (제목, 내용, 키워드, 요약)"),
         openapi.Parameter('doc_type', in_=openapi.IN_QUERY, type=openapi.TYPE_STRING, description="공문 타입", enum=[choice.value for choice in DocumentTypeChoices]),
         openapi.Parameter('region_ids', in_=openapi.IN_QUERY, type=openapi.TYPE_STRING, description="쉼표로 구분된 지역 ID 목록 (예: '1,2,3')"),
@@ -553,12 +529,8 @@ def upcoming_deadlines_api(request):
 )
 @api_view(['GET'])
 def all_documents_search_api(request):
-    """
-    쿼리 파라미터에 따라 모든 공문을 검색, 필터링, 정렬하여 반환합니다.
-    """
     try:
-        # 쿼리 파라미터 가져오기 및 기본값 설정
-        q = request.query_params.get('q') # 새로운 검색어 파라미터
+        q = request.query_params.get('q')
         doc_type = request.query_params.get('doc_type')
         region_ids_str = request.query_params.get('region_ids')
         category_ids_str = request.query_params.get('category_ids')
@@ -566,14 +538,10 @@ def all_documents_search_api(request):
         page = int(request.query_params.get('page', 1))
         page_size = int(request.query_params.get('page_size', 10))
 
-        # 모든 Document 객체로 시작합니다.
         documents = Document.objects.all()
         
-        # 필터링 조건 추가
         filters = Q()
         if q:
-            # 검색어 필터링을 추가합니다.
-            # Q 객체의 '|' 연산자를 사용하여 OR 조건을 만듭니다.
             filters &= (
                 Q(doc_title__icontains=q) |
                 Q(doc_content__icontains=q) |
@@ -594,20 +562,16 @@ def all_documents_search_api(request):
             if category_ids:
                 filters &= Q(categories__id__in=category_ids)
         
-        # 필터링 적용 및 중복 제거
         filtered_documents = documents.filter(filters).distinct()
 
-        # 정렬 적용
         if order == 'oldest':
             filtered_documents = filtered_documents.order_by('pub_date')
-        else: # 기본값 'latest'
+        else:
             filtered_documents = filtered_documents.order_by('-pub_date')
 
-        # 페이지네이션 적용
         offset = (page - 1) * page_size
         paginated_documents = filtered_documents[offset:offset + page_size]
         
-        # 결과 시리얼라이즈
         serializer = DocumentSerializer(paginated_documents, many=True)
 
         return Response(
