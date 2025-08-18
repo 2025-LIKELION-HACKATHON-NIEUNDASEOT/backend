@@ -1,32 +1,49 @@
+import re
+from urllib.parse import urlparse, urljoin
 from bs4 import BeautifulSoup
-from urllib.parse import urljoin, urlparse
+from ..api import fetch_first_image_enhanced
+import logging
+
+logger = logging.getLogger(__name__)
 
 class DocumentDataProcessor:
     @staticmethod
     def process_seoul_api_data(api_data, region_id):
-        """서울시/도봉구 OpenAPI 데이터 처리"""
+        #서울시/도봉구 OpenAPI 데이터 처리
         processed_documents = []
         for item in api_data:
-            # LINK에서 도메인 추출
-            link = item.get('LINK', '')
-            base_url = ''
-            if link:
-                parsed_url = urlparse(link)
-                base_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
+            pcode = item.get('SHEET_ID')
+            link_url = f"https://www.dobong.go.kr/bbs.asp?bmode=D&pcode={pcode}&code=10008769" if pcode else None
+            
+            if item.get('CONTENTS'):
+                link_match = re.search(r'(https?://\S+)', item['CONTENTS'])
+                if link_match:
+                    link_url = link_url or link_match.group(1)
 
-            # CONTENT, DESCRIPTION, BODY 등 다양한 필드 지원
-            doc_content = (
-                item.get('CONTENT')
-                or item.get('DESCRIPTION')
-                or item.get('BODY')
-                or ''
-            )
+            image_url = None
+            if link_url:
+                logger.info(f"문서 ID: {pcode} - 미리보기 이미지 추출 시도: {link_url}")
+                try:
+                    image_url = fetch_first_image_enhanced(link_url)
+                except Exception as e:
+                    logger.error(f"미리보기 이미지 추출 중 오류 발생: {e}")
 
-            image_url = DocumentDataProcessor.extract_image_url(doc_content, base_url)
+            if not image_url:
+                logger.warning(f"미리보기 이미지 추출 실패, 본문에서 이미지 추출 시도.")
+                doc_content = (
+                    item.get('CONTENT')
+                    or item.get('DESCRIPTION')
+                    or item.get('BODY')
+                    or ''
+                )
+                link = item.get('LINK', '')
+                base_url = f"{urlparse(link).scheme}://{urlparse(link).netloc}" if link else ''
+                image_url = DocumentDataProcessor.extract_image_url(doc_content, base_url)
 
             processed_documents.append({
                 'title': item.get('TITLE'),
-                'content': doc_content,
+                'content': item.get('CONTENTS'),
+                'link_url': link_url, # 링크 URL 추가
                 'pub_date': item.get('PUBLISH_DATE') or item.get('PUBDATE'),
                 'deadline': item.get('DEADLINE'),
                 'category': item.get('CATEGORY'),
@@ -38,12 +55,8 @@ class DocumentDataProcessor:
 
     @staticmethod
     def process_api_data(raw_doc, region_id):
-        """기타 외부 API 데이터 처리"""
         link = raw_doc.get('link', '')
-        base_url = ''
-        if link:
-            parsed_url = urlparse(link)
-            base_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
+        base_url = f"{urlparse(link).scheme}://{urlparse(link).netloc}" if link else ''
 
         doc_content = raw_doc.get('content', '')
         image_url = DocumentDataProcessor.extract_image_url(doc_content, base_url)
@@ -56,24 +69,18 @@ class DocumentDataProcessor:
             'category': raw_doc.get('category'),
             'department': raw_doc.get('department'),
             'region_id': region_id,
-            'image_url': image_url
+            'image_url': image_url,
+            'link_url': raw_doc.get('link') # link 추가
         }
 
     @staticmethod
     def extract_image_url(html_content, base_url):
-        """
-        본문 HTML에서 첫 번째 이미지 URL 추출
-        - img 태그 src
-        - img가 없으면 a 태그 href 중 이미지 확장자(.jpg, .png 등) 추출
-        """
         soup = BeautifulSoup(html_content or '', "html.parser")
 
-        # 1. <img> 태그에서 이미지 추출
         img_tag = soup.find("img")
         if img_tag and img_tag.get("src"):
             return urljoin(base_url, img_tag["src"])
 
-        # 2. 첨부파일 중 이미지 확장자 검색
         for a_tag in soup.find_all("a", href=True):
             href = a_tag["href"].lower()
             if href.endswith((".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp")):

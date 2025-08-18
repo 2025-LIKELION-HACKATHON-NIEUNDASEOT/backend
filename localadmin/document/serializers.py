@@ -30,6 +30,8 @@ class DocumentSerializer(serializers.ModelSerializer):
     categories = CategorySerializer(many=True, read_only=True)
     doc_type_display = serializers.CharField(source='get_doc_type_display', read_only=True)
     days_until_deadline = serializers.SerializerMethodField()
+    # 계산 필드니까 수동 추가
+    summary = serializers.CharField(read_only=True)
     
     class Meta:
         model = Document

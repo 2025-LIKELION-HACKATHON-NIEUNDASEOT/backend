@@ -13,6 +13,7 @@ from .services import DocumentService, DocumentDataProcessor
 from .services.seoul_api_service import SeoulAPIService, DocumentService as SeoulDocumentService
 from .serializers import DocumentSerializer, DocumentListSerializer, DocumentDetailWithSimilarSerializer
 from .utils import analyze_document_content, search_similar_documents_in_db, list_to_comma_separated_str, comma_separated_str_to_list
+from document.api import fetch_first_image_enhanced
 
 from scrap.models import DocumentScrap
 from .serializers import DocumentScrapUpcomingSerializer
@@ -118,31 +119,31 @@ class DocumentListView(generics.ListAPIView):
         required=['region_id', 'service_name'],
         properties={
             'region_id': openapi.Schema(
-                type=openapi.TYPE_INTEGER, 
+                type=openapi.TYPE_INTEGER,
                 description='지역 ID'
             ),
             'service_name': openapi.Schema(
-                type=openapi.TYPE_STRING, 
+                type=openapi.TYPE_STRING,
                 description='서울시 API 서비스명 (예: ListPublicDataPblancDetail)'
             ),
             'api_key': openapi.Schema(
-                type=openapi.TYPE_STRING, 
+                type=openapi.TYPE_STRING,
                 description='서울시 API 키',
             ),
             'start_idx': openapi.Schema(
-                type=openapi.TYPE_INTEGER, 
+                type=openapi.TYPE_INTEGER,
                 description='시작 인덱스 (기본값: 1)',
                 default=1
             ),
             'end_idx': openapi.Schema(
-                type=openapi.TYPE_INTEGER, 
+                type=openapi.TYPE_INTEGER,
                 description='종료 인덱스 (기본값: 100)',
                 default=100
             ),
         }
     ),
     responses={
-        201: "동기화 성공", 
+        201: "동기화 성공",
         400: "잘못된 요청",
         500: "서버 오류"
     },
@@ -156,50 +157,58 @@ def sync_seoul_api_data(request):
         api_key = request.data.get('api_key')
         start_idx = request.data.get('start_idx', 1)
         end_idx = request.data.get('end_idx', 100)
-        
+
         if not region_id or not service_name:
             return Response(
-                {'error': '지역 ID와 서비스명이 필요합니다.'}, 
+                {'error': '지역 ID와 서비스명이 필요합니다.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         api_service = SeoulAPIService(api_key)
-        
+
         api_data = api_service.fetch_documents_from_api(
             service_name=service_name,
             start_idx=start_idx,
             end_idx=end_idx
         )
-        
+
         if not api_data:
             return Response(
                 {'message': 'API에서 데이터를 가져오지 못했습니다.',
-                 'created_count': 0}, 
+                 'created_count': 0},
                 status=status.HTTP_200_OK
             )
-        
+
         processed_documents = DocumentDataProcessor.process_seoul_api_data(
             api_data, region_id
         )
         
+        # processed_documents에 link_url이 포함되어 있다고 가정
+        # 이제 이미지 추출 로직을 추가합니다.
+        for doc in processed_documents:
+            link_url = doc.get('link_url') # link_url 필드 추가 후 사용 가능
+            if link_url:
+                image_url = fetch_first_image_enhanced(link_url)
+                if image_url:
+                    doc['image_url'] = image_url
+        
         created_documents = SeoulDocumentService.bulk_create_documents_from_seoul_api(
             processed_documents
         )
-        
+
         return Response({
             'message': f'서울시 API에서 {len(created_documents)}개의 공문을 성공적으로 동기화했습니다.',
             'created_count': len(created_documents),
             'total_fetched': len(api_data),
-            'documents': DocumentListSerializer(created_documents, many=True).data[:10]  # 처음 10개만 반환
+            'documents': DocumentListSerializer(created_documents, many=True).data[:10]
         }, status=status.HTTP_201_CREATED)
-        
+
     except Exception as e:
         logger.error(f"Seoul API sync error: {e}")
         return Response(
-            {'error': f'동기화 중 오류가 발생했습니다: {str(e)}'}, 
+            {'error': f'동기화 중 오류가 발생했습니다: {str(e)}'},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
-
 
 @swagger_auto_schema(
     method='post',

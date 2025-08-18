@@ -1,18 +1,35 @@
-from django.core.management.base import BaseCommand
-from document.models import Region, Document
-from document.services.jongno_api_service import JongnoAPIService, JongnoDocumentProcessor
-from document.api import classify_doc_type
-from datetime import datetime
+import json
 import logging
 import re
+from pathlib import Path
+from datetime import datetime
+from django.core.management.base import BaseCommand
+from django.utils import timezone
+from django.utils.html import strip_tags
+from document.models import Document, DocumentTypeChoices, Category, Region
+from document.services.jongno_api_service import JongnoDocumentProcessor
 
 logger = logging.getLogger(__name__)
 
 class Command(BaseCommand):
-    help = "종로구 OpenAPI에서 문서를 가져와 저장하고, 마감일과 문서 타입을 업데이트합니다."
+    help = "종로구 JSON 파일에서 문서를 가져와 DB에 저장합니다."
 
     def handle(self, *args, **options):
-        # Region 조회/생성
+        self.stdout.write("jn.json 파일을 읽고 있습니다...")
+        file_path = Path('jn.json')
+        if not file_path.exists():
+            self.stderr.write(self.style.ERROR(f'오류: 파일이 존재하지 않습니다. {file_path}'))
+            return
+
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            documents_data = data.get('DATA', [])
+            self.stdout.write(self.style.SUCCESS(f"파일에서 {len(documents_data)}개의 문서를 발견했습니다."))
+        except (IOError, json.JSONDecodeError) as e:
+            self.stderr.write(self.style.ERROR(f"JSON 파일 읽기 또는 파싱 오류: {e}"))
+            return
+
         try:
             region, _ = Region.objects.get_or_create(
                 district="종로구",
@@ -22,44 +39,49 @@ class Command(BaseCommand):
             self.stderr.write(self.style.ERROR(f"Region 조회/생성 오류: {e}"))
             return
 
-        # API 호출
-        api_service = JongnoAPIService()
         processor = JongnoDocumentProcessor()
-        service_name = "ListPublicReservationCulture"
+        saved_count = 0
+        for doc in documents_data:
+            try:
+                title = doc.get('title', "제목 없음")
+                content_raw = doc.get('description', "")
+                pub_date_str = doc.get('pubdate')
+                link_url = doc.get('link')
+                related_departments = doc.get('department')
+                
+                doc_content = strip_tags(content_raw)
+                pub_date = processor.parse_date(pub_date_str)
+                if not pub_date:
+                    pub_date = timezone.now()
+                
+                doc_type = processor.classify_document_type(title, doc_content)
+                extracted_deadline = processor.extract_deadline(doc_content)
+                
+                image_url_match = re.search(r'src=[\'"](http[s]?://.*?)[\'"]', content_raw)
+                image_url = image_url_match.group(1) if image_url_match else None
 
-        api_data = api_service.fetch_documents(service_name, 1, 100)
+                document, created = Document.objects.update_or_create(
+                    doc_title=title,
+                    defaults={
+                        'doc_content': doc_content,
+                        'doc_type': doc_type,
+                        'pub_date': pub_date,
+                        'dead_date': extracted_deadline,
+                        'is_active': True,
+                        'region_id': region.id,
+                        'image_url': image_url,
+                        'link_url': link_url,
+                        'related_departments': related_departments
+                    }
+                )
 
+                categories = processor.extract_categories(title, doc_content)
+                category_objs = Category.objects.filter(category_name__in=categories)
+                document.categories.set(category_objs)
 
-        if not api_data:
-            self.stdout.write(self.style.WARNING("종로구 API에서 데이터를 가져오지 못했습니다."))
-            return
+                saved_count += 1
+                self.stdout.write(self.style.SUCCESS(f"[저장 완료] {title}"))
+            except Exception as e:
+                self.stderr.write(self.style.ERROR(f"문서 처리 중 오류 발생: {title} - {e}"))
 
-        # 데이터 처리 및 DB 저장
-        saved_count = processor.process_and_save(api_data, region.id)
-        self.stdout.write(self.style.SUCCESS(f"{saved_count}개의 종로구 문서를 저장했습니다."))
-
-        # 마감일 필드 채우기 (최신 100개 문서)
-        self.stdout.write("공문 내용에서 마감일을 추출합니다...")
-        documents_to_update = Document.objects.filter(region_id=region.id, dead_date__isnull=True).order_by('-created_at')[:100]
-        date_updated_count = 0
-        for doc in documents_to_update:
-            extracted_date = JongnoDocumentProcessor.extract_deadline(doc.doc_content or "")
-            doc.deadline_date = extracted_date
-            doc.save()
-            if extracted_date:
-                doc.dead_date = extracted_date
-                doc.save()
-                date_updated_count += 1
-        self.stdout.write(self.style.SUCCESS(f"{date_updated_count}개의 문서에 마감일이 추가되었습니다."))
-
-        # 문서 타입 재분류 (최신 100개 문서)
-        self.stdout.write("문서 타입을 재분류합니다...")
-        updated_count = 0
-        queryset = Document.objects.filter(region_id=region.id).order_by('-id')[:100]
-        for doc in queryset:
-            new_type = classify_doc_type(doc.doc_title, doc.doc_content or "")
-            if doc.doc_type != new_type['type']:
-                doc.doc_type = new_type['type']
-                doc.save()
-                updated_count += 1
-        self.stdout.write(self.style.SUCCESS(f"{updated_count}개의 문서 타입이 재분류되었습니다."))
+        self.stdout.write(self.style.SUCCESS(f"{saved_count}개의 문서를 처리하여 데이터베이스에 저장했습니다."))
