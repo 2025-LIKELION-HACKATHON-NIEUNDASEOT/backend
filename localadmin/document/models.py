@@ -1,6 +1,6 @@
 from django.db import models
 from user.models import User, Category, BaseTimeStampModel
-
+from region.models import Region
 
 class DocumentTypeChoices(models.TextChoices):
     # 문서 타입 선택
@@ -63,6 +63,31 @@ class Document(BaseTimeStampModel):
         blank        = True,
         verbose_name = '이미지 URL',
         help_text   = '이미지 파일 URL 또는 경로'
+    )
+    # 이미지 추출용 링크 필드 추가
+    link_url = models.CharField(
+        max_length=512,
+        null=True,
+        blank=True,
+        verbose_name='원본 링크 URL'
+    )
+    # 추천 관련 Gemini 캐시용 필드 추가
+    keywords = models.TextField(
+        null=True, 
+        blank=True
+    )
+    related_departments = models.TextField(
+        null=True, 
+        blank=True
+    )
+    purpose = models.TextField(
+        null=True, 
+        blank=True
+    )
+    # 요약 필드 추가
+    summary = models.TextField(
+        null=True, 
+        blank=True
     )
 
     class Meta:

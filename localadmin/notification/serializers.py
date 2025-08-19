@@ -14,7 +14,7 @@ class NotificationListSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'title', 'content', 'is_read', 
             'notification_time', 'read_time', 'time_since',
-            'document_info'
+            'document_info', 'similar_documents'
         ]
 
 
