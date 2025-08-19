@@ -367,7 +367,8 @@ def scrap_detail(request, scrap_id):
     - **page_size** (int, 선택) : 페이지 크기, 기본값 10
     
     **응답 데이터:**
-    - **id** (int) : 공문 ID
+    - **id** (int) : 스크랩 ID
+    - **document** (int) : 공문 ID
     - **doc_title** (string) : 공문 제목
     - **doc_type** (string) : 공문 타입
     - **doc_type_display** (string) : 공문 타입 한글명
@@ -398,6 +399,7 @@ def scrap_detail(request, scrap_id):
                         "results": [
                             {
                                 "id": 4,
+                                "document": 3,
                                 "doc_title": "서울시, 중장년 기술창업 지원 강화…입주기업 70% 쿼터제 첫 도입",
                                 "doc_type": "PARTICIPATION",
                                 "doc_type_display": "참여",
