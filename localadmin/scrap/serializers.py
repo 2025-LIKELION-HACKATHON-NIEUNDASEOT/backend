@@ -117,6 +117,7 @@ class RegionSimpleSerializer(serializers.ModelSerializer):
 
 class DocumentScrapListSerializer(serializers.ModelSerializer):
     # 공문 스크랩 목록
+    document         = serializers.IntegerField(source='document.id', read_only=True)
     doc_title        = serializers.CharField(source='document.doc_title', read_only=True)
     doc_type         = serializers.CharField(source='document.doc_type', read_only=True)
     doc_type_display = serializers.CharField(source='document.get_doc_type_display', read_only=True)
@@ -128,7 +129,7 @@ class DocumentScrapListSerializer(serializers.ModelSerializer):
     class Meta:
         model  = DocumentScrap
         fields = [
-            'id', 'doc_title', 'doc_type', 'doc_type_display', 
+            'id', 'document',  'doc_title', 'doc_type', 'doc_type_display', 
             'pub_date', 'region', 'categories', 'image_url', 'created_at'
         ]
     
