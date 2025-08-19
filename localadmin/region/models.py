@@ -1,5 +1,4 @@
 from django.db import models
-from django.db import models
 
 class Region(models.Model):
     region_code = models.CharField(max_length=16, unique=True) # 식별용 고유 코드 - 임시용!

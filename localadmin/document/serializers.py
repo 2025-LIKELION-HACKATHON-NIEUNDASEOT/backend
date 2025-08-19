@@ -1,7 +1,8 @@
 from rest_framework import serializers
 from .models import Document
 from user.models import Category
-
+from scrap.models import DocumentScrap
+from django.utils import timezone
 
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
@@ -17,14 +18,10 @@ class DocumentListSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Document
-        fields = [
-            'id', 'doc_title', 'doc_type', 'doc_type_display',
-            'pub_date', 'dead_date', 'has_deadline',
-            'region_id', 'categories'
-        ]
+        fields = '__all__'
     
     def get_has_deadline(self, obj):
-        """마감일 존재 여부 (참여형 공문용)"""
+        # 마감일 존재 여부 (참여형 공문용)
         return obj.dead_date is not None
 
 
@@ -33,15 +30,12 @@ class DocumentSerializer(serializers.ModelSerializer):
     categories = CategorySerializer(many=True, read_only=True)
     doc_type_display = serializers.CharField(source='get_doc_type_display', read_only=True)
     days_until_deadline = serializers.SerializerMethodField()
+    # 계산 필드니까 수동 추가
+    summary = serializers.CharField(read_only=True)
     
     class Meta:
         model = Document
-        fields = [
-            'id', 'doc_title', 'doc_content', 'doc_type', 'doc_type_display',
-            'pub_date', 'dead_date', 'days_until_deadline',
-            'region_id', 'categories', 'image_url',
-            'created_at'
-        ]
+        fields = '__all__'
     
     def get_days_until_deadline(self, obj):
         # 마감일
@@ -50,3 +44,28 @@ class DocumentSerializer(serializers.ModelSerializer):
         
         diff = obj.dead_date.date() - timezone.now().date()
         return diff.days if diff.days >= 0 else -1
+
+# 유사 공문 추천
+class SimilarDocumentSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    doc_title = serializers.CharField(max_length=255)
+    preview_content = serializers.CharField()
+    pub_date = serializers.DateTimeField()
+    score = serializers.FloatField()
+
+class DocumentDetailWithSimilarSerializer(DocumentSerializer):
+    similar_documents = SimilarDocumentSerializer(many=True, read_only=True)
+
+    # class Meta(DocumentSerializer.Meta):
+    #     fields = DocumentSerializer.Meta.fields + ('similar_documents',)
+
+    class Meta:
+        model = Document
+        fields = '__all__'
+
+class DocumentScrapUpcomingSerializer(serializers.ModelSerializer):
+    document = DocumentSerializer(read_only=True)
+
+    class Meta:
+        model = DocumentScrap
+        fields = ['id', 'created_at', 'document']

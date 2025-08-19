@@ -18,7 +18,6 @@ class Command(BaseCommand):
             gyeonggi_region = Region.objects.filter(city='경기도').first()
             
             if not gyeonggi_region:
-                # self.stderr.write(self.style.ERROR("`city`가 '경기도'인 Region 객체를 찾을 수 없습니다. DB에 '경기도'를 먼저 추가해주세요."))
                 return
         except Exception as e:
             # self.stderr.write(self.style.ERROR(f"Region 객체 조회 중 오류 발생: {e}"))
