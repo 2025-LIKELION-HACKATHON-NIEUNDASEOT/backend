@@ -93,8 +93,8 @@ from .utils import (
                     }
                 ),
                 example=[
-                    {"region_id": 11, "type": "거주지"},
-                    {"region_id": 4, "type": "관심지역"}
+                    {"region_id": 6, "type": "거주지"},
+                    {"region_id": 24, "type": "관심지역"}
                 ],
                 description="관심 지역 배열 (Region 테이블 PK 기반)"
             )

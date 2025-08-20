@@ -132,8 +132,8 @@ class Command(BaseCommand):
 
             # PK 기반 관심 지역 생성 
             regions_to_add = [
-                {'region_id': 11, 'type': RegionTypeChoices.RESIDENCE},    
-                {'region_id': 4, 'type': RegionTypeChoices.INTEREST}     
+                {'region_id': 6, 'type': RegionTypeChoices.RESIDENCE},    
+                {'region_id': 24, 'type': RegionTypeChoices.INTEREST}     
             ]
 
             created_count = 0
