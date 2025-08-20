@@ -434,20 +434,18 @@ class DocumentDetailView(generics.RetrieveAPIView):
     def get(self, request, *args, **kwargs):
         instance = self.get_object()
         
-        # 캐싱된 거 사용
-        analyzed_data = {}
-        # keywords만 있어도
-        if instance.keywords:
-            print(f"--- Document ID {instance.id}: 캐싱된 분석 데이터 사용 ---")
+        # 캐싱된 데이터 사용 (summary가 존재하면)
+        if instance.summary:
+            print(f"--- Document ID {instance.id}: 캐싱된 요약 데이터 사용 ---")
             analyzed_data = {
-                "title": instance.doc_title, # 제목은 항상 사용
+                "title": instance.doc_title,
                 "keywords": comma_separated_str_to_list(instance.keywords),
                 "related_departments": comma_separated_str_to_list(instance.related_departments),
                 "purpose": instance.purpose,
                 "summary": instance.summary
             }
         else:
-            # 캐싱x > Gemini API 호출하여 분석
+            # summary가 없으면 Gemini API 호출하여 분석
             print(f"--- Document ID {instance.id}: Gemini API 호출하여 분석 ---")
             document_content = instance.doc_content
             gemini_result = analyze_document_content(document_content)
@@ -458,7 +456,7 @@ class DocumentDetailView(generics.RetrieveAPIView):
                 instance.keywords = list_to_comma_separated_str(gemini_result.get('keywords', []))
                 instance.related_departments = list_to_comma_separated_str(gemini_result.get('related_departments', []))
                 instance.purpose = gemini_result.get('purpose', '')
-                instance.summary = gemini_result.get('summary', '') # Gemini에서 반환된 요약 저장
+                instance.summary = gemini_result.get('summary', '') 
                 
                 try:
                     instance.save(update_fields=['keywords', 'related_departments', 'purpose', 'summary'])
@@ -467,9 +465,10 @@ class DocumentDetailView(generics.RetrieveAPIView):
                     print(f"--- Document ID {instance.id}: 분석 결과 DB 저장 중 오류 발생: {e} ---")
             else:
                 print(f"--- Document ID {instance.id}: Gemini 분석 실패. 유사 공문 추천 및 요약 불가. ---")
+                analyzed_data = {}
 
         similar_docs_data = []
-        if analyzed_data:
+        if analyzed_data and 'keywords' in analyzed_data:
             print(f"--- Document ID {instance.id}: 유사 공문 검색 시작 ---")
             similar_docs_data = search_similar_documents_in_db(analyzed_data, current_doc_id=instance.id, limit=3)
             print(f"--- Document ID {instance.id}: 최종 유사 공문 검색 결과: {len(similar_docs_data)}개 ---")
@@ -479,6 +478,7 @@ class DocumentDetailView(generics.RetrieveAPIView):
         response_data['similar_documents'] = similar_docs_data
 
         return Response(response_data, status=status.HTTP_200_OK)
+        
 
 @swagger_auto_schema(
     method='get',

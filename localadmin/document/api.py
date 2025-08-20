@@ -394,7 +394,7 @@ def fetch_first_image_enhanced(link_url):
         logger.error(f"[fetch_first_image_enhanced] URL이 없음")
         return None
 
-    # 일단 Selenium을 사용하여 이미지 추출 시도
+    # 1트로 Selenium을 사용하여 이미지 추출 시도
     logger.info("[fetch_first_image_enhanced] Step 1: Selenium으로 이미지 추출 시도")
     image_url = fetch_image_with_selenium(link_url)
     if image_url:
