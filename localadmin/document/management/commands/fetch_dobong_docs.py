@@ -8,10 +8,10 @@ import re
 def extract_date_from_content(content):
     
     date_patterns = [
-        r'(\d{4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일',  # YYYY년 MM월 DD일
-        r'(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\.',         # YYYY. MM. DD.
-        r'(\d{4})\s*.\s*(\d{1,2})\s*.\s*(\d{1,2})\s*\(\w\)', # YYYY. M. D. (요일)
-        r'(\d{4})-(\d{1,2})-(\d{1,2})'                   # YYYY-MM-DD
+        r'(\d{4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일',
+        r'(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\.',
+        r'(\d{4})\s*.\s*(\d{1,2})\s*.\s*(\d{1,2})\s*\(\w\)',
+        r'(\d{4})-(\d{1,2})-(\d{1,2})'
     ]
     
     for pattern in date_patterns:

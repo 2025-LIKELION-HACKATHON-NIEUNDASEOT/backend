@@ -35,7 +35,12 @@ class DocumentSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Document
-        fields = '__all__'
+        fields = ('id', 'categories', 'doc_type_display', 'days_until_deadline', 
+                  'summary', 'created_at', 'doc_title', 'doc_content', 'doc_type', 
+                  'pub_date', 'dead_date', 'is_active', 'region_id', 'image_url', 
+                  'link_url', 'keywords', 'related_departments', 'purpose')
+        # 전체 필드
+        # fields = tuple(f.name for f in Document._meta.fields)
     
     def get_days_until_deadline(self, obj):
         # 마감일
@@ -56,12 +61,12 @@ class SimilarDocumentSerializer(serializers.Serializer):
 class DocumentDetailWithSimilarSerializer(DocumentSerializer):
     similar_documents = SimilarDocumentSerializer(many=True, read_only=True)
 
-    # class Meta(DocumentSerializer.Meta):
-    #     fields = DocumentSerializer.Meta.fields + ('similar_documents',)
+    class Meta(DocumentSerializer.Meta):
+        fields = DocumentSerializer.Meta.fields + ('similar_documents',)
 
-    class Meta:
-        model = Document
-        fields = '__all__'
+    # class Meta:
+    #     model = Document
+    #     fields = '__all__'
 
 class DocumentScrapUpcomingSerializer(serializers.ModelSerializer):
     document = DocumentSerializer(read_only=True)
