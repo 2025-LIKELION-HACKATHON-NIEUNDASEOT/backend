@@ -60,12 +60,12 @@ from .utils import (
             'birth': openapi.Schema(
                 type=openapi.TYPE_STRING,
                 format='date',
-                example="1995-03-15",
+                example="2000-01-01",
                 description="생년월일 (YYYY-MM-DD 형식)"
             ),
             'gender': openapi.Schema(
                 type=openapi.TYPE_STRING,
-                example="M",
+                example="F",
                 enum=['M', 'F', 'OTHER'],
                 description="성별 (M: 남성, F: 여성, OTHER: 기타)"
             ),
@@ -93,8 +93,8 @@ from .utils import (
                     }
                 ),
                 example=[
-                    {"region_id": 2, "type": "거주지"},
-                    {"region_id": 5, "type": "관심지역"}
+                    {"region_id": 11, "type": "거주지"},
+                    {"region_id": 4, "type": "관심지역"}
                 ],
                 description="관심 지역 배열 (Region 테이블 PK 기반)"
             )
@@ -198,7 +198,6 @@ def _update_user_profile(user, validated_data):
 
 def _update_user_categories(user, category_ids):
     """사용자 관심 주제 업데이트"""
-    # 기존 관계 삭제
     UserCategory.objects.filter(user=user).delete()
     
     if not category_ids:
