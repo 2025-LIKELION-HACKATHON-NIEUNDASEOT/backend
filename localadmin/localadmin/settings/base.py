@@ -26,7 +26,6 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
-    'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -99,4 +98,10 @@ CORS_ALLOWED_METHODS = [
     "PATCH",
     "DELETE",
     "OPTIONS",
+]
+
+ALLOWED_HOSTS = [
+    'villit.o-r.kr',
+    'localhost',
+    '127.0.0.1',
 ]
