@@ -108,7 +108,6 @@ class DocumentService:
         for doc_data in documents_data:
             doc_title = doc_data.get('doc_title')
             link_url = doc_data.get('link_url')
-            -
             is_duplicate = False
             if doc_title and doc_title in existing_titles:
                 is_duplicate = True
