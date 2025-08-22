@@ -13,57 +13,125 @@ from user.models import Category
 logger = logging.getLogger(__name__)
 
 
+# class DocumentService:
+    
+#     # bulk_create_documents에 통합, 추후 삭제 예정
+#     @staticmethod
+#     def create_document(document_data: Dict[str, Any]) -> Document:
+#         try:
+#             with transaction.atomic():
+#                 categories_data = document_data.pop('categories', [])
+#                 document = Document.objects.create(**document_data)
+                
+#                 if categories_data:
+#                     document.categories.set(categories_data)
+                
+#                 logger.info(f"Document created: {document.id} - {document.doc_title}")
+#                 return document
+                
+#         except Exception as e:
+#             logger.error(f"Error creating document: {e}")
+#             raise ValidationError(f"공문 생성 중 오류가 발생했습니다: {str(e)}")
+    
+#     @staticmethod
+#     def bulk_create_documents(documents_data: List[Dict[str, Any]]) -> List[Document]:
+#         created_documents = []
+        
+#         try:
+#             with transaction.atomic():
+#                 for doc_data in documents_data:
+#                     try:
+#                         if not DocumentService._is_duplicate(doc_data):
+#                             document = DocumentService.create_document(doc_data)
+#                             created_documents.append(document)
+#                         else:
+#                             logger.info(f"Duplicate document skipped: {doc_data.get('doc_title', 'Unknown')}")
+                    
+#                     except Exception as e:
+#                         logger.error(f"Error creating individual document: {e}")
+#                         continue
+                
+#                 logger.info(f"Bulk created {len(created_documents)} documents")
+#                 return created_documents
+                
+#         except Exception as e:
+#             logger.error(f"Error in bulk creation: {e}")
+#             raise ValidationError(f"공문 일괄 생성 중 오류가 발생했습니다: {str(e)}")
+    
+#     # bulk_create_documents에 통합, 추후 삭제 예정
+#     @staticmethod
+#     def _is_duplicate(document_data: Dict[str, Any]) -> bool:
+#         return Document.objects.filter(
+#             doc_title=document_data.get('doc_title'),
+#             region_id=document_data.get('region_id'),
+#             pub_date=document_data.get('pub_date')
+#         ).exists()
+
+
+# document/services.py (수정된 코드)
+
+from django.db import transaction
+from django.utils import timezone
+from django.core.exceptions import ValidationError
+from typing import Dict, List, Optional, Any
+import logging
+from bs4 import BeautifulSoup
+from urllib.parse import urljoin, urlparse
+from datetime import datetime
+import requests
+from django.db.models import Q
+
+from document.models import Document, DocumentTypeChoices
+from user.models import Category
+
+logger = logging.getLogger(__name__)
+
+# 중복되지 않은 문서만 생성하도록 fix
 class DocumentService:
-    
-    @staticmethod
-    def create_document(document_data: Dict[str, Any]) -> Document:
-        try:
-            with transaction.atomic():
-                categories_data = document_data.pop('categories', [])
-                document = Document.objects.create(**document_data)
-                
-                if categories_data:
-                    document.categories.set(categories_data)
-                
-                logger.info(f"Document created: {document.id} - {document.doc_title}")
-                return document
-                
-        except Exception as e:
-            logger.error(f"Error creating document: {e}")
-            raise ValidationError(f"공문 생성 중 오류가 발생했습니다: {str(e)}")
-    
     @staticmethod
     def bulk_create_documents(documents_data: List[Dict[str, Any]]) -> List[Document]:
-        created_documents = []
+        if not documents_data:
+            return []
+
+        doc_titles = [doc.get('doc_title') for doc in documents_data]
+        link_urls = [doc.get('link_url') for doc in documents_data if 'link_url' in doc]
         
-        try:
-            with transaction.atomic():
-                for doc_data in documents_data:
-                    try:
-                        if not DocumentService._is_duplicate(doc_data):
-                            document = DocumentService.create_document(doc_data)
-                            created_documents.append(document)
-                        else:
-                            logger.info(f"Duplicate document skipped: {doc_data.get('doc_title', 'Unknown')}")
-                    
-                    except Exception as e:
-                        logger.error(f"Error creating individual document: {e}")
-                        continue
+        existing_docs = Document.objects.filter(
+            Q(doc_title__in=doc_titles) | Q(link_url__in=link_urls)
+        ).values('doc_title', 'link_url')
+        
+        existing_titles = {doc['doc_title'] for doc in existing_docs}
+        existing_urls = {doc['link_url'] for doc in existing_docs if doc['link_url']}
+        
+        # 중복되지 않는 새로운 문서
+        new_documents = []
+        for doc_data in documents_data:
+            doc_title = doc_data.get('doc_title')
+            link_url = doc_data.get('link_url')
+            -
+            is_duplicate = False
+            if doc_title and doc_title in existing_titles:
+                is_duplicate = True
+            elif link_url and link_url in existing_urls:
+                is_duplicate = True
                 
-                logger.info(f"Bulk created {len(created_documents)} documents")
-                return created_documents
+            if not is_duplicate:
+                new_documents.append(Document(**doc_data))
                 
-        except Exception as e:
-            logger.error(f"Error in bulk creation: {e}")
-            raise ValidationError(f"공문 일괄 생성 중 오류가 발생했습니다: {str(e)}")
-    
-    @staticmethod
-    def _is_duplicate(document_data: Dict[str, Any]) -> bool:
-        return Document.objects.filter(
-            doc_title=document_data.get('doc_title'),
-            region_id=document_data.get('region_id'),
-            pub_date=document_data.get('pub_date')
-        ).exists()
+        if not new_documents:
+            logger.info("모든 문서가 중복되어 생성된 문서가 없습니다.")
+            return []
+            
+        with transaction.atomic():
+            created_documents = Document.objects.bulk_create(new_documents)
+            
+            for doc in created_documents:
+                original_data = next((d for d in documents_data if d['doc_title'] == doc.doc_title), None)
+                if original_data and 'categories' in original_data:
+                    doc.categories.set(original_data['categories'])
+            
+            logger.info(f"성공적으로 {len(created_documents)}개의 문서가 일괄 생성되었습니다.")
+            return created_documents
 
 class DocumentDataProcessor:
     TYPE_MAPPING = {
