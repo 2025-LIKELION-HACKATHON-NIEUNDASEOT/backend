@@ -9,6 +9,7 @@ from datetime import datetime
 import requests
 from document.models import Document, DocumentTypeChoices
 from user.models import Category
+from django.db.models import Q
 
 logger = logging.getLogger(__name__)
 
@@ -67,25 +68,6 @@ logger = logging.getLogger(__name__)
 #             pub_date=document_data.get('pub_date')
 #         ).exists()
 
-
-# document/services.py (수정된 코드)
-
-from django.db import transaction
-from django.utils import timezone
-from django.core.exceptions import ValidationError
-from typing import Dict, List, Optional, Any
-import logging
-from bs4 import BeautifulSoup
-from urllib.parse import urljoin, urlparse
-from datetime import datetime
-import requests
-from django.db.models import Q
-
-from document.models import Document, DocumentTypeChoices
-from user.models import Category
-
-logger = logging.getLogger(__name__)
-
 # 중복되지 않은 문서만 생성하도록 fix
 class DocumentService:
     @staticmethod
@@ -108,6 +90,7 @@ class DocumentService:
         for doc_data in documents_data:
             doc_title = doc_data.get('doc_title')
             link_url = doc_data.get('link_url')
+
             is_duplicate = False
             if doc_title and doc_title in existing_titles:
                 is_duplicate = True

@@ -60,9 +60,16 @@ class SimilarDocumentSerializer(serializers.Serializer):
 
 class DocumentDetailWithSimilarSerializer(DocumentSerializer):
     similar_documents = SimilarDocumentSerializer(many=True, read_only=True)
+    chatbot_session_id = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Document
+        # DocumentSerializer의 Meta.fields를 가져와서 튜플로 변환한 후,
+        # 새로운 필드 튜플과 합칩니다.
+        fields = DocumentSerializer.Meta.fields + ('similar_documents', 'chatbot_session_id',)
 
-    class Meta(DocumentSerializer.Meta):
-        fields = DocumentSerializer.Meta.fields + ('similar_documents',)
+    def get_chatbot_session_id(self, obj):
+        return self.context.get('chatbot_session_id')
 
     # class Meta:
     #     model = Document

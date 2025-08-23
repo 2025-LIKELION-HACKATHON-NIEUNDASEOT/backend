@@ -19,8 +19,8 @@ from scrap.models import DocumentScrap
 from .serializers import DocumentScrapUpcomingSerializer
 from user.utils import get_current_user, create_success_response, create_error_response
 
-
-
+# ChatbotSession 모델
+from chatbot.models import ChatbotSession
 
 logger = logging.getLogger(__name__)
 
@@ -434,6 +434,34 @@ class DocumentDetailView(generics.RetrieveAPIView):
     def get(self, request, *args, **kwargs):
         instance = self.get_object()
         
+        # 챗봇 세션에 연결할 사용자 객체를 가져옵니다.
+        # 이 함수가 게스트 사용자도 올바르게 처리합니다.
+        user_for_session = get_current_user()
+        
+        # 챗봇 세션 ID를 초기화합니다.
+        chatbot_session_id = None
+        
+        # 만약 유효한 사용자 객체가 있다면 세션을 생성합니다.
+        if user_for_session:
+            try:
+                chatbot_session, created = ChatbotSession.objects.get_or_create(
+                    document=instance,
+                    defaults={'user': user_for_session}
+                )
+                chatbot_session_id = chatbot_session.id
+                if created:
+                    print(f"--- Document ID {instance.id}: 새로운 챗봇 세션 생성 (ID: {chatbot_session_id}) ---")
+                else:
+                    print(f"--- Document ID {instance.id}: 기존 챗봇 세션 사용 (ID: {chatbot_session_id}) ---")
+            except Exception as e:
+                print(f"--- 챗봇 세션 생성 중 오류 발생: {e} ---")
+        else:
+            print("--- 유효한 사용자 객체를 찾을 수 없어 챗봇 세션을 생성하지 않습니다. ---")
+
+        # 챗봇 세션 id 전달
+        serializer_context = self.get_serializer_context()
+        serializer_context['chatbot_session_id'] = chatbot_session.id
+        
         # 캐싱된 데이터 사용 (summary가 존재하면)
         if instance.summary:
             print(f"--- Document ID {instance.id}: 캐싱된 요약 데이터 사용 ---")
@@ -473,12 +501,17 @@ class DocumentDetailView(generics.RetrieveAPIView):
             similar_docs_data = search_similar_documents_in_db(analyzed_data, current_doc_id=instance.id, limit=3)
             print(f"--- Document ID {instance.id}: 최종 유사 공문 검색 결과: {len(similar_docs_data)}개 ---")
         
-        serializer = self.get_serializer(instance)
+        serializer = self.get_serializer(instance, context=serializer_context)
         response_data = serializer.data
         response_data['similar_documents'] = similar_docs_data
 
         return Response(response_data, status=status.HTTP_200_OK)
-        
+    
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context['request'] = self.request
+        return context
+
 
 @swagger_auto_schema(
     method='get',
