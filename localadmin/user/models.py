@@ -135,7 +135,7 @@ class UserRegion(models.Model):
     class Meta:
         db_table = 'user_region'
         verbose_name = '사용자 관심 지역'
-        unique_together = ('user', 'region') # 여기서 region_id 대신 region
+        unique_together = ('user', 'region') 
 
     def __str__(self):
         return f"{self.user.user_id} → {self.region} ({self.type})"
