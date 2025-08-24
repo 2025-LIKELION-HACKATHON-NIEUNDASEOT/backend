@@ -26,7 +26,6 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
-    'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -88,7 +87,7 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 MEDIA_ROOT  = os.path.join(BASE_DIR, 'media')
 
 CORS_ALLOWED_ORIGINS = [
-    "https://vilit.vercel.app",
+    "https://villit.vercel.app",
     "http://localhost:3000",
 ]
 
@@ -99,4 +98,10 @@ CORS_ALLOWED_METHODS = [
     "PATCH",
     "DELETE",
     "OPTIONS",
+]
+
+ALLOWED_HOSTS = [
+    'villit.o-r.kr',
+    'localhost',
+    '127.0.0.1',
 ]

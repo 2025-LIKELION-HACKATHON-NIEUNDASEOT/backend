@@ -117,7 +117,6 @@ class UserProfileUpdateSerializer(serializers.Serializer):
                         f"유효하지 않은 지역 타입: {region_data['type']}. "
                         f"가능한 값: {valid_types}"
                     )
-                # 반드시 숫자 ID여야 함
                 if not isinstance(region_data['region_id'], int):
                     raise serializers.ValidationError("region_id는 숫자(ID)여야 합니다.")
                 if not Region.objects.filter(id=region_data['region_id']).exists():

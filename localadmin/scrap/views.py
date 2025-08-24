@@ -373,6 +373,7 @@ def scrap_detail(request, scrap_id):
     - **doc_type** (string) : 공문 타입
     - **doc_type_display** (string) : 공문 타입 한글명
     - **pub_date** (string) : 게시 날짜 (ISO 8601)
+    - **dead_date**: 마감 날짜
     - **region** (object) : 공문 관련 지역 정보
       - **id** (int) : 지역 ID
       - **city** (string) : 시/도
@@ -404,6 +405,7 @@ def scrap_detail(request, scrap_id):
                                 "doc_type": "PARTICIPATION",
                                 "doc_type_display": "참여",
                                 "pub_date": "2025-08-08T09:00:00+09:00",
+                                "dead_date": None,
                                 "region": {
                                     "id": 1,
                                     "city": "서울특별시",
@@ -416,7 +418,7 @@ def scrap_detail(request, scrap_id):
                                         "category_name": "교통"
                                     }
                                 ],
-                                "image_url": "/media/document/2025/08/11/sample.jpg",
+                                "image_url": "(완료 후 수정)",
                                 "created_at": "2025-08-11T20:51:31.793230+09:00"
                             }
                         ]
