@@ -6,7 +6,7 @@ class RegionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Region
-        fields = ['region_code', 'city', 'district', 'full_name']  
+        fields = ['id', 'region_code', 'city', 'district', 'full_name']  
         
     # district가 있으면 city+district
     def get_full_name(self, obj):
