@@ -18,7 +18,7 @@ class DocumentListSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Document
-        fields = ('id', 'doc_title', 'doc_content', 'doc_type', 'doc_type_display', 'pub_date', 'dead_date', 'has_deadline', 'categories')
+        fields = ('id', 'doc_title', 'doc_content', 'doc_type', 'doc_type_display', 'pub_date', 'dead_date', 'has_deadline', 'categories', 'region_id')
     
     def get_has_deadline(self, obj):
         return obj.dead_date is not None
