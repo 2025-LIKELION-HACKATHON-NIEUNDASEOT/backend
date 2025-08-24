@@ -434,14 +434,10 @@ class DocumentDetailView(generics.RetrieveAPIView):
     def get(self, request, *args, **kwargs):
         instance = self.get_object()
         
-        # 챗봇 세션에 연결할 사용자 객체를 가져옵니다.
-        # 이 함수가 게스트 사용자도 올바르게 처리합니다.
         user_for_session = get_current_user()
         
-        # 챗봇 세션 ID를 초기화합니다.
         chatbot_session_id = None
         
-        # 만약 유효한 사용자 객체가 있다면 세션을 생성합니다.
         if user_for_session:
             try:
                 chatbot_session, created = ChatbotSession.objects.get_or_create(

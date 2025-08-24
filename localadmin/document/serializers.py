@@ -18,10 +18,9 @@ class DocumentListSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Document
-        fields = '__all__'
+        fields = ('id', 'doc_title', 'doc_content', 'doc_type', 'doc_type_display', 'pub_date', 'dead_date', 'has_deadline', 'categories')
     
     def get_has_deadline(self, obj):
-        # 마감일 존재 여부 (참여형 공문용)
         return obj.dead_date is not None
 
 
@@ -64,8 +63,6 @@ class DocumentDetailWithSimilarSerializer(DocumentSerializer):
     
     class Meta:
         model = Document
-        # DocumentSerializer의 Meta.fields를 가져와서 튜플로 변환한 후,
-        # 새로운 필드 튜플과 합칩니다.
         fields = DocumentSerializer.Meta.fields + ('similar_documents', 'chatbot_session_id',)
 
     def get_chatbot_session_id(self, obj):
@@ -76,7 +73,8 @@ class DocumentDetailWithSimilarSerializer(DocumentSerializer):
     #     fields = '__all__'
 
 class DocumentScrapUpcomingSerializer(serializers.ModelSerializer):
-    document = DocumentSerializer(read_only=True)
+    #document = DocumentSerializer(read_only=True)
+    document = DocumentListSerializer(read_only=True)
 
     class Meta:
         model = DocumentScrap
