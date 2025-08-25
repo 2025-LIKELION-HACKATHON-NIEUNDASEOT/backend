@@ -9,27 +9,25 @@ class CategorySerializer(serializers.ModelSerializer):
         model = Category
         fields = ['id', 'category_name']
 
-
+# 공문 목록 조회 시 필드 정의
 class DocumentListSerializer(serializers.ModelSerializer):
-    # 목록용
     categories = CategorySerializer(many=True, read_only=True)
     doc_type_display = serializers.CharField(source='get_doc_type_display', read_only=True)
     has_deadline = serializers.SerializerMethodField()
     
     class Meta:
         model = Document
-        fields = ('id', 'doc_title', 'doc_content', 'doc_type', 'doc_type_display', 'pub_date', 'dead_date', 'has_deadline', 'categories', 'region_id')
+        fields = ('id', 'doc_title', 'doc_content', 'doc_type', 'doc_type_display', 'pub_date', 'dead_date', 'has_deadline', 'categories', 'region_id', 'image_url')
     
     def get_has_deadline(self, obj):
         return obj.dead_date is not None
 
-
+# 공문 상세 정보 포함 (마감일, 디데이 필드 포함)
 class DocumentSerializer(serializers.ModelSerializer):
-    # 상세 조회
     categories = CategorySerializer(many=True, read_only=True)
     doc_type_display = serializers.CharField(source='get_doc_type_display', read_only=True)
     days_until_deadline = serializers.SerializerMethodField()
-    # 계산 필드니까 수동 추가
+    # 계산 필드->수동 추가
     summary = serializers.CharField(read_only=True)
     
     class Meta:
@@ -56,7 +54,9 @@ class SimilarDocumentSerializer(serializers.Serializer):
     preview_content = serializers.CharField()
     pub_date = serializers.DateTimeField()
     score = serializers.FloatField()
+    image_url = serializers.URLField(allow_null=True) # image_url 필드 추가
 
+# documentserializer 상속 - 유사 공문 목록, 챗봇 세션 id 필드 추가해서 리턴
 class DocumentDetailWithSimilarSerializer(DocumentSerializer):
     similar_documents = SimilarDocumentSerializer(many=True, read_only=True)
     chatbot_session_id = serializers.SerializerMethodField()

@@ -7,6 +7,7 @@ from django.conf import settings
 import json
 import re
 
+# 변수에서 api 가져와 gemini 모델 초기화
 def initialize_gemini():
     api_key = os.environ.get('GEMINI_API_KEY')
     if not api_key:
@@ -33,6 +34,7 @@ else:
 #     except Exception as e:
 #         return False, str(e)
 
+# gemini 모델로 공문 내용 분석 및 요약, 키워드, 관련 부서 추출
 def analyze_document_content(document_text, max_retries=3, base_delay=60):
     # 긴 텍스트 컷 > 토큰 사용량 다운
     max_content_length = 3000
@@ -162,6 +164,7 @@ def comma_separated_str_to_list(data_str):
     return [item.strip() for item in data_str.split(',') if item.strip()]
     
 
+# fulltext 인덱스로 공문 상세 보기에서 유사한 다른 문서 찾아 추천
 def search_similar_documents_in_db(analyzed_data, current_doc_id=None, limit=3):
     """
     분석된 데이터를 바탕으로 유사 공문을 찾습니다.
