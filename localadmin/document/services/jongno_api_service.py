@@ -9,6 +9,7 @@ from document.models import Document, DocumentTypeChoices, Category
 
 logger = logging.getLogger(__name__)
 
+# 종로구청 공지사항 OpenAPI에 요청해서 json 데이터 가져옴
 class JongnoAPIService:
     BASE_URL = "http://openapi.seoul.go.kr:8088"
 
@@ -44,6 +45,7 @@ class JongnoAPIService:
             logger.error(f"JSON 디코딩 오류: {e}")
             return []
 
+# 공문 제목, 내용 기반으로 타입, 카테고리 분류 > 추후 다른 api 파싱 service 코드와 통합
 class JongnoDocumentProcessor:
     participation_keywords = ['모집', '신청', '참여', '설문', '공모', '접수', '워크샵', '세미나', '교육', '강의', '행사', '이벤트']
     notice_keywords = ['안내', '통보', '알림', '변경', '시행', '제도', '규정', '정책', '운영', '서비스', '시설', '휴무', '중단']
@@ -96,6 +98,7 @@ class JongnoDocumentProcessor:
                 continue
         return None
 
+    # api 데이터 목록 순회하면서 각 공문을 document 모델에 저장 - 문서 업데이트or생성
     @classmethod
     def process_and_save(cls, api_data, region_id):
         saved_count = 0

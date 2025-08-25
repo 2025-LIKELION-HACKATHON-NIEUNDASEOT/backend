@@ -52,6 +52,7 @@ def get_openapi_key_for_user(user):
                 return settings.JONGNO_OPENAPI_KEY
     return settings.DOBONG_OPENAPI_KEY
 
+# profile 설정 기반 Openapi에서 데이터 xml 형태로 가져옴
 def fetch_notices_for_user(user, start_index=1, end_index=5):
     key = get_openapi_key_for_user(user)
     api_name = 'DobongNewsNoticeList'
@@ -73,6 +74,7 @@ def fetch_notices_for_user(user, start_index=1, end_index=5):
     response.raise_for_status()
     return response.text
 
+# XML -> 딕셔너리 변환
 def parse_notices(xml_str):
     root = ET.fromstring(xml_str)
     notices = []
@@ -89,6 +91,7 @@ def parse_notices(xml_str):
         notices.append(notice)
     return notices
 
+# 제목, 내용 기반으로 문서 타입과 카테고리 분류
 def classify_doc_type(title, content):
     category_mapping = {
         '문화': ['문화', '예술', '공연', '전시', '축제', '영화', '음악', '행사'],
@@ -118,6 +121,7 @@ def classify_doc_type(title, content):
         "type": type_result
     }
 
+# 분류 완료된 데이터 DB에 저장
 def save_notices_to_db(notices, user):
     region = None
     if hasattr(user, 'profile'):
@@ -386,8 +390,8 @@ def fetch_image_with_selenium(link_url):
             driver.quit()
 
 
+# 이미지 추출 최종 메인 로직 - selenium으로 동적 로딩 웹페이지에서 이미지 추출
 def fetch_first_image_enhanced(link_url):
-    # 이미지 추출 메인로직 업
     logger.info(f"[fetch_first_image_enhanced] === 향상된 이미지 추출 시작 === URL: {link_url}")
 
     if not link_url:

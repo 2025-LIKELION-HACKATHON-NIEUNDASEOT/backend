@@ -24,6 +24,7 @@ from chatbot.models import ChatbotSession
 
 logger = logging.getLogger(__name__)
 
+# 공문 목록 최신순 조회 - 지역, 카테고리, 타입별로 필터링 가능
 class DocumentListView(generics.ListAPIView):
     serializer_class = DocumentListSerializer
     
@@ -110,6 +111,7 @@ class DocumentListView(generics.ListAPIView):
 #         return super().get(request, *args, **kwargs)
 
 
+# 서울시 해당 구청 openapi에서 데이터 가져와 db에 동기화
 @swagger_auto_schema(
     method='post',
     operation_summary="서울시 OpenAPI 데이터 동기화",
@@ -418,6 +420,8 @@ def get_recent_category_alerts(request):
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
+# 특정 공문 상세 정보 조회
+# 챗봇 세션 생성or가져옴, 공문 요약 캐싱 확인or분석 후 저장, 유사 공문 추천
 class DocumentDetailView(generics.RetrieveAPIView):
     queryset = Document.objects.filter(is_active=True)
     serializer_class = DocumentDetailWithSimilarSerializer
@@ -509,6 +513,7 @@ class DocumentDetailView(generics.RetrieveAPIView):
         return context
 
 
+# 마감일 가까운 공문 조회
 @swagger_auto_schema(
     method='get',
     operation_summary="마감일이 가까운 스크랩 공문 목록 조회",

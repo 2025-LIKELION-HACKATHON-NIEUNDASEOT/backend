@@ -13,6 +13,7 @@ from document.serializers import DocumentSerializer
 
 logger = logging.getLogger(__name__)
 
+# 추후 서울시 전체로 서비스 범위 확대를 위해 서울시 OpenAPI용 초안
 
 class SeoulAPIService:
     def __init__(self, api_key=None):
