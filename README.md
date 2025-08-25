@@ -77,16 +77,41 @@
 </div>
 
 ---
-## 🏗 서버 아키텍처 (제작 중)
+## 🏗 서버 아키텍처 및 흐름
 <div align="center">
-    <img src="">
+  <li>아키텍처</li><br>
+    <img src="https://i.postimg.cc/x84CK391/image.jpg"><br>
+  <br><li>흐름도</li><br>
+    <img src="https://i.postimg.cc/brgtttB6/Untitled-diagram-Mermaid-Chart-2025-08-25-032759.png">
 </div>
 
 ---
 
-## 📖 API 명세서 (제작 중)
-- [📗 Villit 백엔드 스웨거](https://villit.o-r.kr/swagger/)
-- API 정리
+## 📖 API 명세서
+- [📗 Villit 백엔드 스웨거](https://villit.o-r.kr/swagger/)<br>
+
+- API 간단 정리
+<details>
+  <summary>챗봇</summary>
+  <img src="https://i.postimg.cc/8kZds8gT/image.jpg">
+</details>
+<details>
+  <summary>공문</summary>
+  <img src="https://i.postimg.cc/d0crgwrj/image.jpg">
+</details>
+<details>
+  <summary>알림</summary>
+  <img src="https://i.postimg.cc/3NqD1T3p/image.jpg">
+</details>
+<details>
+  <summary>스크랩</summary>
+  <img src="https://i.postimg.cc/SQPXwmpY/image.jpg">
+</details>
+<details>
+  <summary>사용자와 지역</summary>
+  <img src="https://i.postimg.cc/Kj3YZgyk/image.jpg">
+  <img src="https://i.postimg.cc/HkgbhTQ4/image.jpg">
+</details>
 
 
 ---
